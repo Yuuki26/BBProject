@@ -14,7 +14,7 @@ public class Frames extends JFrame {
         initUI();
         pack();
         setLocationRelativeTo(null);
-        setMinimumSize(new Dimension(1280, 960));
+        setMinimumSize(new Dimension(2560, 1280));
     }
     private JPanel wrapper(JPanel content) {
         JPanel wrapper = new JPanel(new BorderLayout());

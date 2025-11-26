@@ -18,7 +18,10 @@ public class Skill_Dialogs extends JPanel {
         setLayout(new BorderLayout());
 
         JPanel grid = new JPanel();
-        grid.setBorder(BorderFactory.createTitledBorder("Select 2 Skills"));
+        grid.setBorder(BorderFactory.createEmptyBorder(50, 30, 50, 30));
+        JLabel title = new JLabel("Select 2 Skills", SwingConstants.CENTER);
+        title.setFont(title.getFont().deriveFont(Font.BOLD, 18f));
+        add(title, BorderLayout.NORTH);
 
         List<Skills> allSkills = Skils_register.getAllSkills();
 
@@ -60,7 +63,7 @@ public class Skill_Dialogs extends JPanel {
         JPanel bottom = new JPanel(new FlowLayout(FlowLayout.CENTER));
         bottom.add(confirm);
 
-        add(new JScrollPane(grid), BorderLayout.WEST);
+        add(new JScrollPane(grid), BorderLayout.CENTER);
         add(bottom, BorderLayout.SOUTH);
     }
 

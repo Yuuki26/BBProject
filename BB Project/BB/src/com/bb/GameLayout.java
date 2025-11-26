@@ -1,45 +1,48 @@
 package com.bb;
 
-import Ships.DataHandler;
-import Ships.DefaultFleet;
-import Ships.Fleet_Layout;
-import Ships.Ship_Placement;
+import Ships.*;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.dnd.DropTarget;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
 import java.awt.image.BufferedImage;
+import java.util.*;
+import java.util.List;
 
 public class GameLayout extends JPanel {
+    private String lastGhostKey = null;
     private final int SIZE = 8;
     private Fleet_Layout fleet_layout;
     private DefaultFleet fleet;
-    private boolean[][] occupied=new boolean[SIZE][SIZE];
+    private boolean[][] occupied = new boolean[SIZE][SIZE];
+
+    // map to remember which tiles were painted for each committed Ship_Placement
+    private final Map<Ship_Placement, List<Point>> placedMap = new HashMap<>();
+
     JPanel grid = new JPanel(new GridLayout(SIZE, SIZE, 2, 2)) {
         @Override
         public Dimension getPreferredSize() {
-
-            return new Dimension(800, 800);
+            return new Dimension(2560, 1280);
         }
     };
-
 
     public GameLayout(Frame frame) {
         setLayout(new BorderLayout());
         add(createBoardPanel(), BorderLayout.CENTER);
         fleet = new DefaultFleet();
-        fleet_layout = new Fleet_Layout(fleet);
+        fleet_layout = new Fleet_Layout(fleet, this);
         add(fleet_layout, BorderLayout.EAST);
-
     }
 
     private JPanel createBoardPanel() {
         JPanel outer = new JPanel(new BorderLayout());
         JPanel boardPanel = new JPanel(new BorderLayout());
+
         // Top column labels
         JPanel top = new JPanel(new GridLayout(1, SIZE + 1));
         top.add(new JLabel()); // top-left empty corner
-
-
         for (int c = 0; c < SIZE; c++) {
             JLabel lbl = new JLabel(String.valueOf((char) ('A' + c)), SwingConstants.CENTER);
             lbl.setFont(lbl.getFont().deriveFont(Font.BOLD, 14f));
@@ -57,8 +60,10 @@ public class GameLayout extends JPanel {
         }
         center.add(leftLabels, BorderLayout.WEST);
 
-        // Grid of buttons (cells)
+        // Create a single CellTransferHandler instance and attach to every cell
+        CellTransferHandler cellHandler = new CellTransferHandler(this);
 
+        // Grid of buttons (cells)
         for (int r = 0; r < SIZE; r++) {
             for (int c = 0; c < SIZE; c++) {
                 JButton cell = new JButton();
@@ -69,36 +74,17 @@ public class GameLayout extends JPanel {
                 String coord = "" + (char) ('A' + c) + (r + 1);
                 cell.putClientProperty("coord", coord);
 
-                // Accept ship drops
-                cell.setTransferHandler(new TransferHandler() {
+                // Attach the unified handler (supports both drop and export)
+                cell.setTransferHandler(cellHandler);
+
+                // Attach a single mouse-drag listener once (guarded by presence of "ship")
+                cell.addMouseMotionListener(new MouseMotionAdapter() {
                     @Override
-                    public boolean canImport(TransferSupport support) {
-                        return support.isDataFlavorSupported(DataHandler.SHIP_FLAVOR);
-                    }
-
-                    @Override
-                    public boolean importData(TransferSupport support) {
-                        try {
-                            Ship_Placement sp = (Ship_Placement) support.getTransferable()
-                                    .getTransferData(DataHandler.SHIP_FLAVOR);
-
-                            // Get cell coordinates
-                            String coord = (String) ((JComponent) support.getComponent()).getClientProperty("coord");
-                            int col = coord.charAt(0) - 'A';
-                            int row = Integer.parseInt(coord.substring(1)) - 1;
-
-                            // Update ship origin
-                            sp.setOrigin(new Point(col, row));
-                            //collision checking
-
-
-                            // Paint ship across its occupied tiles
-                            paintShip(sp,true);
-
-                            return true;
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            return false;
+                    public void mouseDragged(MouseEvent e) {
+                        JComponent comp = (JComponent) e.getSource();
+                        if (comp.getClientProperty("ship") instanceof Ship_Placement) {
+                            TransferHandler handler = comp.getTransferHandler();
+                            handler.exportAsDrag(comp, e, TransferHandler.MOVE);
                         }
                     }
                 });
@@ -107,39 +93,105 @@ public class GameLayout extends JPanel {
             }
         }
 
-            center.add(grid, BorderLayout.CENTER);
-            boardPanel.add(center, BorderLayout.CENTER);
-            JPanel wrapper = new JPanel(new GridBagLayout()); // centers its child
-            Dimension fixed = new Dimension(800, 800);
-            boardPanel.setPreferredSize(fixed);
-            boardPanel.setMinimumSize(fixed);
-            boardPanel.setMaximumSize(fixed);
-            wrapper.add(boardPanel); // GridBagLayout centers by default
+        center.add(grid, BorderLayout.CENTER);
+        boardPanel.add(center, BorderLayout.CENTER);
 
-            return wrapper;
+        JPanel wrapper = new JPanel(new GridBagLayout()); // centers its child
+        Dimension fixed = new Dimension(800, 800);
+        boardPanel.setPreferredSize(fixed);
+        boardPanel.setMinimumSize(fixed);
+        boardPanel.setMaximumSize(fixed);
+        wrapper.add(boardPanel); // GridBagLayout centers by default
 
+        outer.add(wrapper, BorderLayout.CENTER);
 
-        }
-    private void paintShip(Ship_Placement sp,boolean ghost) {
-        int tileSize = 100;
+        // Ensure ghost clears when the drag leaves the grid
+        new DropTarget(grid, new java.awt.dnd.DropTargetListener() {
+            @Override public void dragEnter(java.awt.dnd.DropTargetDragEvent dtde) { }
+            @Override public void dragOver(java.awt.dnd.DropTargetDragEvent dtde) { }
+            @Override public void dropActionChanged(java.awt.dnd.DropTargetDragEvent dtde) { }
+            @Override public void drop(java.awt.dnd.DropTargetDropEvent dtde) {
+                // drop will be handled by TransferHandler.importData; clear ghost afterwards
+                clearGhost();
+                lastGhostKey = null;
+            }
+            @Override public void dragExit(java.awt.dnd.DropTargetEvent dte) {
+                // clear ghost when leaving the grid entirely
+                clearGhost();
+                lastGhostKey = null;
+            }
+        });
 
-        // Validate placement first
+        return outer;
+    }
+
+    /**
+     * Public API used by CellTransferHandler
+     */
+    public boolean validatePlacement(Ship_Placement sp) {
         for (Point p : sp.getOccupiedTiles()) {
             if (p.x < 0 || p.x >= SIZE || p.y < 0 || p.y >= SIZE) {
-                JOptionPane.showMessageDialog(this, "Ship out of bounds!");
+                return false; // out of bounds
+            }
+            if (occupied[p.y][p.x]) {
+                return false; // collision
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Commit placement: paint ship on board and remove from fleet UI.
+     * This is the authoritative commit point called by CellTransferHandler.importData.
+     */
+    public void commitPlacement(Ship_Placement sp) {
+        paintShip(sp, false);
+        if (fleet_layout != null) {
+            fleet_layout.removeShip(sp);
+            fleet_layout.revalidate();
+            fleet_layout.repaint();
+        }
+    }
+
+    /**
+     * Paint ship tiles (public so CellTransferHandler can call commitPlacement which calls this).
+     */
+    public void paintShip(Ship_Placement sp, boolean ghost) {
+        int tileSize = 150;
+
+        // If committing, clear any previously painted tiles for this same ship
+        if (!ghost) {
+            List<Point> prev = placedMap.remove(sp);
+            if (prev != null) {
+                for (Point p : prev) {
+                    if (p.x < 0 || p.x >= SIZE || p.y < 0 || p.y >= SIZE) continue;
+                    int idx = p.y * SIZE + p.x;
+                    JButton cell = (JButton) grid.getComponent(idx);
+                    if (cell.getClientProperty("ship") == sp) {
+                        cell.setIcon(null);
+                        cell.setBackground(Color.WHITE);
+                        cell.putClientProperty("ghost", null);
+                        cell.putClientProperty("ship", null);
+                        occupied[p.y][p.x] = false;
+                    }
+                }
+            }
+        }
+
+        // Validate placement first (bounds + collision)
+        for (Point p : sp.getOccupiedTiles()) {
+            if (p.x < 0 || p.x >= SIZE || p.y < 0 || p.y >= SIZE) {
                 return;
             }
             if (!ghost && occupied[p.y][p.x]) {
-                JOptionPane.showMessageDialog(this, "Collision detected!");
                 return;
             }
         }
 
-        // Load full image
+        // Load full image and scale to ship size
         ImageIcon fullIcon = new ImageIcon(getClass().getResource(sp.getShip().getImage()));
         Image fullImage = fullIcon.getImage();
 
-        // Scale ship to exact tile dimensions
         int tiles = sp.getShip().getSize();
         int shipWidth = sp.isHorizontal() ? tileSize * tiles : tileSize;
         int shipHeight = sp.isHorizontal() ? tileSize : tileSize * tiles;
@@ -148,17 +200,9 @@ public class GameLayout extends JPanel {
         Graphics2D g = shipCanvas.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g.drawImage(fullImage, 0, 0, shipWidth, shipHeight, null);
-
-        // If ghost preview, draw semi-transparent
-        if (ghost) {
-            g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.4f));
-            g.setColor(Color.GRAY);
-            g.fillRect(0, 0, shipWidth, shipHeight);
-        }
         g.dispose();
 
-        // Slice into tiles
-        java.util.List<Point> tilesPoints = sp.getOccupiedTiles();
+        List<Point> tilesPoints = sp.getOccupiedTiles();
         for (int i = 0; i < tiles; i++) {
             int sx = sp.isHorizontal() ? i * tileSize : 0;
             int sy = sp.isHorizontal() ? 0 : i * tileSize;
@@ -170,13 +214,125 @@ public class GameLayout extends JPanel {
 
             cell.setIcon(new ImageIcon(tileImg));
             cell.setBackground(ghost ? Color.LIGHT_GRAY : Color.CYAN);
+            cell.putClientProperty("ghost", null);
 
             if (!ghost) {
-                occupied[p.y][p.x] = true; // mark only if committed
+                occupied[p.y][p.x] = true;
+                cell.putClientProperty("ship", sp);
             }
         }
 
+        // store committed tiles for this ship so we can clear them later
+        if (!ghost) {
+            placedMap.put(sp, new ArrayList<>(sp.getOccupiedTiles()));
+            clearGhost(); // clear any lingering ghost after commit
+            lastGhostKey = null;
+        }
+    }
 
+    /**
+     * Public ghost painting API used by CellTransferHandler.
+     * This method deduplicates repeated ghost painting using lastGhostKey.
+     */
+    public void paintGhost(Ship_Placement sp) {
+        try {
+            String coord = null;
+            // build a small key to detect changes: ship identity + origin + orientation
+            String shipId = Integer.toHexString(System.identityHashCode(sp));
+            Point origin = sp.getOrigin();
+            if (origin != null) {
+                coord = origin.x + ":" + origin.y;
+            } else {
+                coord = "null";
+            }
+            String key = shipId + ":" + coord + ":" + sp.isHorizontal();
+            if (key.equals(lastGhostKey)) {
+                return; // no change
+            }
+            lastGhostKey = key;
+        } catch (Exception ignored) { }
+
+        clearGhost(); // remove old preview
+
+        int tileSize = 150;
+        ImageIcon fullIcon = new ImageIcon(getClass().getResource(sp.getShip().getImage()));
+        Image fullImage = fullIcon.getImage();
+
+        int tiles = sp.getShip().getSize();
+        int shipWidth = sp.isHorizontal() ? tileSize * tiles : tileSize;
+        int shipHeight = sp.isHorizontal() ? tileSize : tileSize * tiles;
+
+        BufferedImage shipCanvas = new BufferedImage(shipWidth, shipHeight, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = shipCanvas.createGraphics();
+        g.drawImage(fullImage, 0, 0, shipWidth, shipHeight, null);
+        g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.4f));
+        g.setColor(Color.GRAY);
+        g.fillRect(0, 0, shipWidth, shipHeight);
+        g.dispose();
+
+        for (int i = 0; i < tiles; i++) {
+            Point p = sp.getOccupiedTiles().get(i);
+            if (p.x < 0 || p.x >= SIZE || p.y < 0 || p.y >= SIZE) continue;
+            if (occupied[p.y][p.x]) continue; // skip committed ships
+
+            int sx = sp.isHorizontal() ? i * tileSize : 0;
+            int sy = sp.isHorizontal() ? 0 : i * tileSize;
+            BufferedImage tileImg = shipCanvas.getSubimage(sx, sy, tileSize, tileSize);
+
+            int index = p.y * SIZE + p.x;
+            JButton cell = (JButton) grid.getComponent(index);
+            cell.setIcon(new ImageIcon(tileImg));
+            cell.setBackground(Color.LIGHT_GRAY);
+            cell.putClientProperty("ghost", Boolean.TRUE);
+        }
+    }
+
+    public void clearGhost() {
+        for (int i = 0; i < grid.getComponentCount(); i++) {
+            JButton cell = (JButton) grid.getComponent(i);
+            if (Boolean.TRUE.equals(cell.getClientProperty("ghost"))) {
+                cell.setIcon(null);
+                cell.setBackground(Color.WHITE);
+                cell.putClientProperty("ghost", null);
+            }
+        }
+        lastGhostKey = null;
+    }
+
+    /**
+     * Remove ship from board (used when returning to roster).
+     * Uses stored placedMap to clear the exact cells that were painted earlier.
+     */
+    public void removeShipFromBoard(Ship_Placement sp) {
+        // Prefer stored tile list so we clear the exact cells that were painted earlier
+        List<Point> prev = placedMap.remove(sp);
+        if (prev == null) {
+            // fallback: clear any cells that reference this ship object
+            for (int i = 0; i < grid.getComponentCount(); i++) {
+                JButton cell = (JButton) grid.getComponent(i);
+                if (cell.getClientProperty("ship") == sp) {
+                    cell.setIcon(null);
+                    cell.setBackground(Color.WHITE);
+                    cell.putClientProperty("ghost", null);
+                    cell.putClientProperty("ship", null);
+                    int r = i / SIZE, c = i % SIZE;
+                    occupied[r][c] = false;
+                }
+            }
+            return;
+        }
+
+        for (Point p : prev) {
+            if (p.x < 0 || p.x >= SIZE || p.y < 0 || p.y >= SIZE) continue;
+            int index = p.y * SIZE + p.x;
+            JButton cell = (JButton) grid.getComponent(index);
+            if (cell.getClientProperty("ship") == sp) {
+                cell.setIcon(null);
+                cell.setBackground(Color.WHITE);
+                cell.putClientProperty("ghost", null);
+                cell.putClientProperty("ship", null);
+                occupied[p.y][p.x] = false;
+            }
+        }
     }
 }
-
