@@ -35,7 +35,7 @@ public class Frames extends JFrame {
 
         getContentPane().setLayout(new BorderLayout());
         getContentPane().add(cards, BorderLayout.CENTER);
-        getContentPane().add(cards, BorderLayout.SOUTH);
+
 
     }
 }
