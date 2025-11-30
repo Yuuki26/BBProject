@@ -12,11 +12,15 @@ public class Navigator extends JPanel  {
         JButton toPlayer = new JButton("Show Player");
         JButton toOpponent = new JButton("Show Opponent");
 
+        JButton pauseButton = new JButton("Pause");
+
         toPlayer.addActionListener(e -> cl.show(cards, "PLAYER"));
         toOpponent.addActionListener(e -> cl.show(cards, "OPPONENT"));
+        pauseButton.addActionListener(e -> cl.show(cards, "PAUSE_MENU"));
 
         add(toPlayer);
         add(toOpponent);
+        add(pauseButton);
         cards.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT)
                 .put(KeyStroke.getKeyStroke("E"), "showPlayer");
         cards.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT)
