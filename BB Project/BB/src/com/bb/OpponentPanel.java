@@ -9,7 +9,6 @@ import java.util.List;
 public class OpponentPanel extends JPanel {
 
     private static final int SIZE = 8;
-
     private final JPanel grid = new JPanel(new GridLayout(SIZE, SIZE, 2, 2)) {
         @Override
         public Dimension getPreferredSize() {
@@ -33,7 +32,7 @@ public class OpponentPanel extends JPanel {
     public OpponentPanel() {
         setLayout(new BorderLayout());
 
-        randomizeFleet();                     
+        randomizeFleet();
         add(createBoardPanel(), BorderLayout.CENTER);
 
         JPanel bottom = new JPanel();
@@ -52,7 +51,6 @@ public class OpponentPanel extends JPanel {
     private JPanel createBoardPanel() {
         JPanel outer = new JPanel(new BorderLayout());
         JPanel boardPanel = new JPanel(new BorderLayout());
-
         JPanel top = new JPanel(new GridLayout(1, SIZE + 1));
         top.add(new JLabel());
         for (int c = 0; c < SIZE; c++) {
@@ -63,7 +61,6 @@ public class OpponentPanel extends JPanel {
         outer.add(top, BorderLayout.NORTH);
 
         JPanel center = new JPanel(new BorderLayout());
-
         JPanel leftLabels = new JPanel(new GridLayout(SIZE, 1));
         for (int r = 1; r <= SIZE; r++) {
             JLabel lbl = new JLabel(String.valueOf(r), SwingConstants.CENTER);
@@ -88,6 +85,7 @@ public class OpponentPanel extends JPanel {
 
         center.add(grid, BorderLayout.CENTER);
         boardPanel.add(center, BorderLayout.CENTER);
+
         JPanel wrapper = new JPanel(new GridBagLayout());
         Dimension fixed = new Dimension(800, 800);
         boardPanel.setPreferredSize(fixed);
@@ -99,7 +97,6 @@ public class OpponentPanel extends JPanel {
 
         return outer;
     }
-
     private void randomizeFleet() {
         int[] SHIP_SIZES = {5, 4, 3, 3, 2};
         java.util.Random rand = new java.util.Random();
@@ -134,7 +131,6 @@ public class OpponentPanel extends JPanel {
             }
         }
     }
-
     private void onCellClicked(int row, int col) {
         if (confirmLocked) return;
         if (firedOnOpponent[row][col]) return;
@@ -148,12 +144,10 @@ public class OpponentPanel extends JPanel {
         cell.setBackground(Color.LIGHT_GRAY);
         selectedShots.add(new Point(col, row));
     }
-
     private void confirmShots() {
         if (selectedShots.isEmpty()) return;
 
         confirmLocked = true;
-
         for (Point p : selectedShots) {
             int col = p.x;
             int row = p.y;
@@ -165,7 +159,6 @@ public class OpponentPanel extends JPanel {
 
             cell.setBackground(isHit ? shotColorHit : shotColorMiss);
         }
-
         if (playerBoard != null) {
             List<Point> shots = randomEnemyShots();
             playerBoard.applyShots(shots);
