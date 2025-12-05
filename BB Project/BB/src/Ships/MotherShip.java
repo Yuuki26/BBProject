@@ -1,13 +1,13 @@
 package Ships;
 
-public class BattleCruiser implements Ships_Type{
-    public int initialShield =2;
-    public int initialDMG =2;
-    public int initialShots =1;
-    public int initialHP=3;
-    public int initialPen=1;
-    public int initialDetection=1;
-    public int Size=3;
+public class MotherShip implements Ships_Type {
+    public int initialShield =5;
+    public int initialDMG =3;
+    public int initialShots =3;
+    public int initialHP=8;
+    public int initialPen=6;
+    public int initialDetection=3;
+    public int Size=4;
     @Override
     public int getShields(
     ) {
@@ -32,6 +32,7 @@ public class BattleCruiser implements Ships_Type{
         return Size;
     }
     public String getImage(){
-        return "/ships/battleCrusier.png";
+        return "/ships/motherShip.png";
     }
+
 }

@@ -7,7 +7,7 @@ public class BattleShip implements Ships_Type {
     public int initialHP=12;
     public int initialPen=8;
     public int initialDetection=5;
-    public int Size=4;
+    public int Size=3;
     @Override
     public int getShields(
     ) {
@@ -29,7 +29,7 @@ public class BattleShip implements Ships_Type {
         return initialDetection;
     }
     public String getImage(){
-        return "/BattleShip_Class.png";
+        return "/ships/BattleShip_Class.png";
     }
     public int getSize(){
         return Size;

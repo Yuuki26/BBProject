@@ -46,13 +46,13 @@ public class PauseMenuPanel extends JPanel {
         JPanel buttonPanel = new JPanel(new GridLayout(3, 1, 10, 10));
         buttonPanel.setOpaque(false);
 
-        resumeButton = createImageButton("/images/resume_btn.png", "Resume");
+        resumeButton = createImageButton("/ui/Ok_BTN.png", "Resume");
         resumeButton.addActionListener(e -> cardLayout.show(cardPanel, "PLAYER"));
 
-        mainMenuButton = createImageButton("/images/menu_btn.png", "Main Menu");
+        mainMenuButton = createImageButton("/ui/Menu_BTN.png", "Main Menu");
         mainMenuButton.addActionListener(e -> cardLayout.show(cardPanel, "START_MENU"));
 
-        exitButton = createImageButton("/images/exit_btn.png", "Exit Game");
+        exitButton = createImageButton("/ui/Exit_BTN.png", "Exit Game");
         exitButton.addActionListener(e -> System.exit(0));
 
         buttonPanel.add(resumeButton);

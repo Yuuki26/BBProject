@@ -9,7 +9,7 @@ public class Frames extends JFrame {
     private final JPanel cards = new JPanel(cl);
 
     public Frames() {
-        super("Battleship"); // A simpler title
+        super("Battleship");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         initUI();
 
@@ -43,7 +43,7 @@ public class Frames extends JFrame {
         // Add the card holder to the main frame
         getContentPane().add(cards, BorderLayout.CENTER);
 
-        // The game should open to the start menu
+        // The game open to the start menu
         cl.show(cards, "START_MENU");
     }
 }

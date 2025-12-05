@@ -27,7 +27,7 @@ public class StartMenuPanel extends JPanel {
 
         //  Title Image
         titleImageSlot = new JLabel();
-        ImageIcon titleIcon = loadIcon("/title.png");
+        ImageIcon titleIcon = loadIcon("/ui/title.png");
         if (titleIcon != null) {
             titleImageSlot.setIcon(titleIcon);
         } else {
@@ -46,10 +46,10 @@ public class StartMenuPanel extends JPanel {
         JPanel buttonPanel = new JPanel(new GridLayout(2, 1, 10, 10));
         buttonPanel.setOpaque(false);
 
-        startButton = createImageButton("/images/start_btn.png", "Start Game");
+        startButton = createImageButton("/ui/Start_BTN.png", "Start Game");
         startButton.addActionListener(e -> cardLayout.show(cardPanel, "PLAYER"));
 
-        exitButton = createImageButton("/images/exit_btn.png", "Exit");
+        exitButton = createImageButton("/ui//Exit_BTN.png", "Exit");
         exitButton.addActionListener(e -> System.exit(0));
 
         buttonPanel.add(startButton);

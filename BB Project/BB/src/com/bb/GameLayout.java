@@ -154,12 +154,15 @@ public class GameLayout extends JPanel {
     }
 
     /**
-     * Paint ship tiles (public so CellTransferHandler can call commitPlacement which calls this).
+     * Paint ship tiles
      */
     public void paintShip(Ship_Placement sp, boolean ghost) {
-        int tileSize = 150;
+        // calculate tile size dynamically based on the grid component size
+        int w = grid.getComponent(0).getWidth();
+        int h = grid.getComponent(0).getHeight();
+        int tileSize = (w > 0 && h > 0) ? Math.min(w, h) : 90; // fallback to 90 if not visible yet
 
-        // If committing, clear any previously painted tiles for this same ship
+        // if committing, clear any previously painted tiles for this same ship
         if (!ghost) {
             List<Point> prev = placedMap.remove(sp);
             if (prev != null) {
@@ -254,7 +257,10 @@ public class GameLayout extends JPanel {
 
         clearGhost(); // remove old preview
 
-        int tileSize = 150;
+        // calculate tile size dynamically based on the grid component size
+        int w = grid.getComponent(0).getWidth();
+        int h = grid.getComponent(0).getHeight();
+        int tileSize = (w > 0 && h > 0) ? Math.min(w, h) : 90; // fallback to 90 if not visible yet
         ImageIcon fullIcon = new ImageIcon(getClass().getResource(sp.getShip().getImage()));
         Image fullImage = fullIcon.getImage();
 
