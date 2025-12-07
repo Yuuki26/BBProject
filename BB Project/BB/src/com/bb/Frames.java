@@ -27,22 +27,27 @@ public class Frames extends JFrame {
     }
 
     private void initUI() {
+
         GameLayout player   = new GameLayout(this);
-        OpponentPanel opponent = new OpponentPanel();
-        opponent.setPlayerBoard(player);
+        OpponentPanel opponent=new OpponentPanel();
+
 
         Skill_Dialogs selection = new Skill_Dialogs(cl, cards);
         MainMenuPanel mainMenu  = new MainMenuPanel(cl, cards);
 
-        cards.setLayout(cl);
-        cards.add(mainMenu,         "MAIN_MENU");
-        cards.add(selection,        "Skills");
-        cards.add(wrapper(player),  "PLAYER");
-        cards.add(wrapper(opponent),"OPPONENT");
+        cards.add(mainMenu,          "MAIN_MENU");
+        cards.add(selection,         "Skills");
+        cards.add(wrapper(player),   "PLAYER");
+        opponent.setPlayerBoard(player);
+        cards.add(wrapper(opponent), "OPPONENT");
 
         getContentPane().setLayout(new BorderLayout());
         getContentPane().add(cards, BorderLayout.CENTER);
 
         cl.show(cards, "MAIN_MENU");
+
     }
+
+
+
 }
