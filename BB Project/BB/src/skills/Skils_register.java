@@ -11,8 +11,11 @@ public class Skils_register  {
         // Register all skills here
         skills.add(new Rapid_Fire());
         skills.add(new Enhance());
-              skills.add(new ERA_silver());
-       skills.add(new ERA_GOLD());
+        skills.add(new ERA_silver());
+        skills.add(new ERA_GOLD());
+        skills.add(new modify_shield());
+        skills.add(new modify_DMG());
+        skills.add(new modify_HP());
         // add more as needed
     }
 
