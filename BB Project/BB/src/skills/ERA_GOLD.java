@@ -1,29 +1,25 @@
 package skills;
 
-import com.bb.GameLayout;
-
-public class Rapid_Fire implements Skills {
+public class ERA_GOLD implements Skills{
     @Override
     public String getName() {
-        return "Rapid Fire";
+        return "ERA";
     }
     public String getDescription() {
-        return "Fire 2 salvos for the cost of 3 turns";
+        return "Blocks 3 salvos for 3 turn";
     }
-
     @Override
     public String getImage() {
-        return "Rapid_Fire.png";
+        return "ERA_AMOR-GOLD.png";
     }
     @Override
-    public float modify_DMG() {
-        return 1f;
-    }
     public float  modify_shield () {
-        return 1f;
+        return 99f;
     }
     public float  modify_HP () {
         return 1f;
     }
-
+    public float  modify_DMG () {
+        return 1f;
+    }
 }

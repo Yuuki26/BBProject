@@ -12,11 +12,18 @@ public class Enhance  implements Skills{
         return "Your Bullets Penetrates More";
     }
     @Override
-    public void activate(GameLayout ctx) {
-
-    }
-    @Override
     public String getImage() {
         return "Enhance.png";
+    }
+
+    @Override
+    public float modify_DMG() {
+        return 1.5f;
+    }
+    public float  modify_shield () {
+        return 1f;
+    }
+    public float  modify_HP () {
+        return 0f;
     }
 }
