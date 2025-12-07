@@ -6,5 +6,9 @@ public interface Skills {
     String getName();
     public String getDescription();
     public String getImage();
-    void activate(GameLayout ctx);
+    default void activate(GameLayout ctx) {}
+
+    default float modify_DMG() { return 1.0f; }
+    default float modify_shield() { return 1.0f; }
+    default float modify_HP() { return 1.0f; }
 }

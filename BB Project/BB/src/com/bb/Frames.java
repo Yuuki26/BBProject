@@ -32,7 +32,7 @@ public class Frames extends JFrame {
         OpponentPanel opponent=new OpponentPanel();
 
 
-        Skill_Dialogs selection = new Skill_Dialogs(cl, cards);
+        Skill_Dialogs selection = new Skill_Dialogs(cl, cards, player::setActiveSkills);
         MainMenuPanel mainMenu  = new MainMenuPanel(cl, cards);
 
         cards.add(mainMenu,          "MAIN_MENU");
