@@ -18,7 +18,7 @@ public class OpponentGenerator {
 
         // Register opponent ship types here
         availableTypes.add(BattleCruiser.class);
-        availableTypes.add(Destroyer.class);
+        availableTypes.add(Submarine.class);
 
     }
 

@@ -7,6 +7,32 @@
 /dataSources/
 /dataSources.local.xml
 
-out/
-.idea/
+# Compiled class files
 *.class
+
+# Log files
+*.log
+
+# BlueJ files (if you use it)
+*.ctxt
+
+# Mobile Tools for Java (J2ME)
+.mtj.tmp/
+
+# Package Files #
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# virtual machine crash logs
+hs_err_pid*
+
+# INTELIJ SPECIFIC (Very Important)
+.idea/
+*.iml
+out/
+build/

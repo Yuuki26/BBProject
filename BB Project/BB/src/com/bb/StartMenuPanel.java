@@ -47,7 +47,7 @@ public class StartMenuPanel extends JPanel {
         buttonPanel.setOpaque(false);
 
         startButton = createImageButton("/ui/Start_BTN.png", "Start Game");
-        startButton.addActionListener(e -> cardLayout.show(cardPanel, "PLAYER"));
+        startButton.addActionListener(e -> cardLayout.show(cardPanel, "Skills"));
 
         exitButton = createImageButton("/ui//Exit_BTN.png", "Exit");
         exitButton.addActionListener(e -> System.exit(0));

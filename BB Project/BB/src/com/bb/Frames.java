@@ -31,7 +31,8 @@ public class Frames extends JFrame {
         PauseMenuPanel pauseMenu = new PauseMenuPanel(cl, cards);
         GameLayout player = new GameLayout(this);
         OpponentPanel opponent = new OpponentPanel();
-        Skill_Dialogs selection = new Skill_Dialogs(cl, cards);
+        opponent.setPlayerBoard(player);
+        Skill_Dialogs selection = new Skill_Dialogs(cl, cards, player::setActiveSkills);
 
         // Add the panels to the card holder
         cards.add(startMenu, "START_MENU");
