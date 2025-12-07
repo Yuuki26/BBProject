@@ -13,7 +13,7 @@ public class Enhance  implements Skills{
     }
     @Override
     public String getImage() {
-        return "Enhance.png";
+        return "skills/Enhance.png";
     }
 
     @Override

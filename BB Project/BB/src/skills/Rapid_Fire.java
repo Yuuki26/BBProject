@@ -13,7 +13,7 @@ public class Rapid_Fire implements Skills {
 
     @Override
     public String getImage() {
-        return "Rapid_Fire.png";
+        return "skills/Rapid_Fire.png";
     }
     @Override
     public float modify_DMG() {
