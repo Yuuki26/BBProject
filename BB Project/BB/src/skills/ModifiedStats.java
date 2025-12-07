@@ -3,13 +3,8 @@ package skills;
 import java.util.List;
 
 public class ModifiedStats {
-    private final List<Skills> skills;
-
-    public ModifiedStats(List<Skills> skills) {
-        this.skills = skills;
-    }
-
     public float dmgModifier() {
+        List<Skills> skills = SkillsRegistry.getSelectedSkills();
         if (skills == null || skills.isEmpty()) return 1f;
         float m = 1f;
         for (Skills s : skills) m *= s.modify_DMG();
@@ -17,6 +12,7 @@ public class ModifiedStats {
     }
 
     public float shieldModifier() {
+        List<Skills> skills = SkillsRegistry.getSelectedSkills();
         if (skills == null || skills.isEmpty()) return 1f;
         float m = 1f;
         for (Skills s : skills) m *= s.modify_shield();
@@ -24,6 +20,7 @@ public class ModifiedStats {
     }
 
     public float hpModifier() {
+        List<Skills> skills = SkillsRegistry.getSelectedSkills();
         if (skills == null || skills.isEmpty()) return 1f;
         float m = 1f;
         for (Skills s : skills) m *= s.modify_HP();
