@@ -11,6 +11,8 @@ public class Skils_register  {
         // Register all skills here
         skills.add(new Rapid_Fire());
         skills.add(new Enhance());
+              skills.add(new ERA_silver());
+       skills.add(new ERA_GOLD());
         // add more as needed
     }
 
@@ -23,3 +25,4 @@ public class Skils_register  {
         skills.add(skill);
     }
 }
+
