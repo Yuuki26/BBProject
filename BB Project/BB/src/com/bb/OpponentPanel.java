@@ -22,6 +22,7 @@ public class OpponentPanel extends JPanel {
     private final boolean[][] occupied = new boolean[SIZE][SIZE];
 
     private GameLayout playerBoard;
+    private Frames mainFrame;
 
     private final int maxShots = 3;
     private final List<Point> selectedShots = new ArrayList<>();
@@ -60,6 +61,10 @@ public class OpponentPanel extends JPanel {
         add(bottom, BorderLayout.SOUTH);
 
         setBorder(BorderFactory.createTitledBorder("Opponent Board"));
+    }
+
+    public void setMainFrame(Frames frame) {
+        this.mainFrame = frame;
     }
 
     /**
@@ -299,6 +304,11 @@ public class OpponentPanel extends JPanel {
             }
         }
 
+        if (checkWinCondition()) {
+            if (mainFrame != null) mainFrame.triggerGameOver(true); // Player Won!
+            return; // Stop the code so AI doesn't fire back
+        }
+
         // finalize
         selectedShots.clear();
         confirmLocked = false;
@@ -320,7 +330,18 @@ public class OpponentPanel extends JPanel {
             statusLabel.setText("Your turn");
         });
         t.setRepeats(false);
-                t.start();
+        t.start();
+    }
 
+    private boolean checkWinCondition() {
+        // If map is empty, ships haven't generated yet, so not a win
+        if (shipHP.isEmpty()) return false;
+
+        for (int hp : shipHP.values()) {
+            if (hp > 0) {
+                return false; // Found a ship that is still alive
+            }
+        }
+        return true; // All ships are <= 0 HP
     }
 }

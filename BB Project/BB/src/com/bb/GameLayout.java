@@ -45,13 +45,16 @@ public class GameLayout extends JPanel {
     // map to remember which tiles were painted for each committed Ship_Placement
     private final Map<Ship_Placement, List<Point>> placedMap = new HashMap<>();
 
+    private Frames parentFrame;
+
     JPanel grid = new JPanel(new GridLayout(SIZE, SIZE, 2, 2)) {
         @Override public Dimension getPreferredSize() {
             return new Dimension(2560, 1280);
         }
     };
 
-    public GameLayout(Frame frame) {
+    public GameLayout(Frames frame) {
+        this.parentFrame = frame;
         setLayout(new BorderLayout());
         add(createBoardPanel(), BorderLayout.CENTER);
         fleet = new DefaultFleet();
@@ -520,6 +523,10 @@ public class GameLayout extends JPanel {
                 revealShipTiles(hitShip, shotColorHit, false);
             }
         }
+
+        if (checkLossCondition()) {
+            if (parentFrame != null) parentFrame.triggerGameOver(false); // Player Lost
+        }
     }
 
     // Backwards-compatible overloads
@@ -529,5 +536,18 @@ public class GameLayout extends JPanel {
 
     public void applyShots(List<Point> shots) {
         applyShots(shots, (List<Ship_Placement>) null, null);
+    }
+
+    private boolean checkLossCondition() {
+        // If map is empty, game hasn't really started or ships are gone
+        if (shipHP.isEmpty() && isLocked) return true; // Empty map after locking means death
+        if (shipHP.isEmpty()) return false; // Not locked yet
+
+        for (int hp : shipHP.values()) {
+            if (hp > 0) {
+                return false; // Player still has a ship
+            }
+        }
+        return true; // All player ships dead
     }
 }
