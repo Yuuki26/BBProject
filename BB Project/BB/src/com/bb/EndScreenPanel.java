@@ -29,7 +29,7 @@ public class EndScreenPanel extends JPanel {
         this.cl = cl;
         this.cards = cards;
         setLayout(new GridBagLayout());
-        setBackground(new Color(0, 0, 0, 200)); // Dark overlay
+        setOpaque(false); // Make transparent so wallpaper shows through
 
         loadAssets();
 
@@ -48,6 +48,14 @@ public class EndScreenPanel extends JPanel {
         contentPane.setLayout(new GridBagLayout());
         
         add(contentPane);
+    }
+    
+    @Override
+    protected void paintComponent(Graphics g) {
+        // Draw the darkening overlay
+        g.setColor(new Color(0, 0, 0, 200));
+        g.fillRect(0, 0, getWidth(), getHeight());
+        super.paintComponent(g);
     }
 
     private void loadAssets() {

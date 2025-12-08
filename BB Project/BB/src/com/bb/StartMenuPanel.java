@@ -18,7 +18,7 @@ public class StartMenuPanel extends JPanel {
         this.cardLayout = cl;
         this.cardPanel = cards;
         setLayout(new GridBagLayout());
-        setBackground(Color.DARK_GRAY); 
+        setOpaque(false);
 
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(15, 15, 15, 15);

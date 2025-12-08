@@ -56,9 +56,11 @@ public class GameLayout extends JPanel {
     public GameLayout(Frames frame) {
         this.parentFrame = frame;
         setLayout(new BorderLayout());
+        setOpaque(false);
         add(createBoardPanel(), BorderLayout.CENTER);
         fleet = new DefaultFleet();
         fleet_layout = new Fleet_Layout(fleet, this);
+        fleet_layout.setOpaque(false); // Make fleet layout transparent
         add(fleet_layout, BorderLayout.EAST);
     }
 
@@ -78,10 +80,13 @@ public class GameLayout extends JPanel {
 
     private JPanel createBoardPanel() {
         JPanel outer = new JPanel(new BorderLayout());
+        outer.setOpaque(false);
         JPanel boardPanel = new JPanel(new BorderLayout());
+        boardPanel.setOpaque(false);
 
         // Top column labels
         JPanel top = new JPanel(new GridLayout(1, SIZE + 1));
+        top.setOpaque(false);
         top.add(new JLabel()); // top-left empty corner
         for (int c = 0; c < SIZE; c++) {
             JLabel lbl = new JLabel(String.valueOf((char) ('A' + c)), SwingConstants.CENTER);
@@ -92,7 +97,9 @@ public class GameLayout extends JPanel {
 
         // Left row labels + grid
         JPanel center = new JPanel(new BorderLayout());
+        center.setOpaque(false);
         JPanel leftLabels = new JPanel(new GridLayout(SIZE, 1));
+        leftLabels.setOpaque(false);
         for (int r = 1; r <= SIZE; r++) {
             JLabel lbl = new JLabel(String.valueOf(r), SwingConstants.CENTER);
             lbl.setFont(lbl.getFont().deriveFont(Font.BOLD, 14f));
@@ -132,11 +139,14 @@ public class GameLayout extends JPanel {
                 grid.add(cell);
             }
         }
+        
+        grid.setOpaque(false);
 
         center.add(grid, BorderLayout.CENTER);
         boardPanel.add(center, BorderLayout.CENTER);
 
         JPanel wrapper = new JPanel(new GridBagLayout()); // centers its child
+        wrapper.setOpaque(false);
         Dimension fixed = new Dimension(800, 800);
         boardPanel.setPreferredSize(fixed);
         boardPanel.setMinimumSize(fixed);
@@ -161,6 +171,7 @@ public class GameLayout extends JPanel {
         });
 
         JPanel controlRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 6));
+        controlRow.setOpaque(false);
         JButton confirmBtn = new JButton("Confirm Positions");
         confirmBtn.addActionListener(e -> {
             if (!isLocked) {

@@ -6,7 +6,28 @@ import java.awt.*;
 
 public class Frames extends JFrame {
     private final CardLayout cl = new CardLayout();
-    private final JPanel cards = new JPanel(cl);
+    private final JPanel cards = new JPanel(cl) {
+        private Image bgImage;
+        {
+            try {
+                java.net.URL url = getClass().getResource("/background.png");
+                if (url != null) {
+                    bgImage = javax.imageio.ImageIO.read(url);
+                } else {
+                    System.err.println("Background image not found: /background.png");
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            if (bgImage != null) {
+                g.drawImage(bgImage, 0, 0, getWidth(), getHeight(), this);
+            }
+        }
+    };
     
     private EndScreenPanel endScreen;
 
@@ -22,6 +43,8 @@ public class Frames extends JFrame {
     }
     private JPanel wrapper(JPanel content) {
         JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.setOpaque(false);
+        content.setOpaque(false); // Ensure the content itself is transparent too
         wrapper.add(content, BorderLayout.CENTER);
         wrapper.add(new Navigator(cl, cards), BorderLayout.SOUTH);
         return wrapper;

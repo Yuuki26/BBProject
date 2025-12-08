@@ -19,8 +19,7 @@ public class PauseMenuPanel extends JPanel {
         this.cardLayout = cl;
         this.cardPanel = cards;
         setLayout(new GridBagLayout());
-        // Semi-transparent black background
-        setBackground(new Color(0, 0, 0, 200)); 
+        setOpaque(false);
 
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(15, 15, 15, 15);
@@ -87,5 +86,13 @@ public class PauseMenuPanel extends JPanel {
             return new ImageIcon(url);
         }
         return null;
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        // Draw the semi-transparent background manually
+        g.setColor(new Color(0, 0, 0, 200));
+        g.fillRect(0, 0, getWidth(), getHeight());
+        super.paintComponent(g);
     }
 }

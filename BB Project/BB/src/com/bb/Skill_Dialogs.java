@@ -29,13 +29,16 @@ public class Skill_Dialogs extends JPanel {
         this.onConfirmSkills = onConfirmSkills;
 
         setLayout(new BorderLayout());
+        setOpaque(false);
 
         JPanel grid = new JPanel();
+        grid.setOpaque(false);
         grid.setBorder(BorderFactory.createEmptyBorder(50, 30, 50, 30));
         grid.setLayout(new FlowLayout(FlowLayout.CENTER, 12, 12));
 
         JLabel title = new JLabel("Select 2 Skills", SwingConstants.CENTER);
         title.setFont(title.getFont().deriveFont(Font.BOLD, 18f));
+        title.setForeground(Color.WHITE); // Make text white to be visible on background
         add(title, BorderLayout.NORTH);
 
         List<Skills> allSkills = Skils_register.getAllSkills();
@@ -66,9 +69,11 @@ public class Skill_Dialogs extends JPanel {
 
             // show icon and a small label under it
             JPanel cell = new JPanel(new BorderLayout());
+            cell.setOpaque(false);
             cell.add(btn, BorderLayout.CENTER);
             JLabel desc = new JLabel(s.getName(), SwingConstants.CENTER);
             desc.setFont(desc.getFont().deriveFont(12f));
+            desc.setForeground(Color.WHITE); // Make text white
             cell.add(desc, BorderLayout.SOUTH);
             grid.add(cell);
         }
@@ -78,9 +83,13 @@ public class Skill_Dialogs extends JPanel {
         confirm.addActionListener(e -> onConfirm());
 
         JPanel bottom = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        bottom.setOpaque(false);
         bottom.add(confirm);
 
-        add(new JScrollPane(grid), BorderLayout.CENTER);
+        JScrollPane scroll = new JScrollPane(grid);
+        scroll.setOpaque(false);
+        scroll.getViewport().setOpaque(false);
+        add(scroll, BorderLayout.CENTER);
         add(bottom, BorderLayout.SOUTH);
     }
 

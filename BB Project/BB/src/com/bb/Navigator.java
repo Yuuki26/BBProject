@@ -8,6 +8,7 @@ import java.awt.event.ActionEvent;
 public class Navigator extends JPanel  {
     public Navigator(CardLayout cl, JPanel cards) {
         setLayout(new FlowLayout(FlowLayout.CENTER, 12, 8));
+        setOpaque(false);
 
         JButton toPlayer = new JButton("Show Player");
         JButton toOpponent = new JButton("Show Opponent");

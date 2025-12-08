@@ -18,8 +18,8 @@ public class MainMenuPanel extends JPanel {
 
     class ResponsivePanel extends JPanel {
 
-        private final Image bg       = loadImage("/background.jpg");
-        private final Image logoBase = loadImage("/title.png");
+        private final Image bg       = loadImage("/background.png");
+        private final Image logoBase = loadImage("ui/title.png");
 
         private Image loadImage(String path) {
             java.net.URL url = MainMenuPanel.class.getResource(path);
