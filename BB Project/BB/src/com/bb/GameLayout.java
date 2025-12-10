@@ -1,47 +1,90 @@
 package com.bb;
 
 import Ships.*;
+import skills.ModifiedStats;
+
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.dnd.DropTarget;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionAdapter;
+import java.awt.event.MouseMotionListener;
 import java.awt.image.BufferedImage;
+import java.io.Serializable;
 import java.util.*;
 import java.util.List;
 
 public class GameLayout extends JPanel {
+
+    // Keep a local copy of selected skills (for reference) but ModifiedStats reads the registry.
+
+    private final ModifiedStats playerMods = new ModifiedStats(); // reads SkillsRegistry internally
+
+    public ModifiedStats getPlayerModifiers() { return playerMods; }
+
+    // board constants / state
     private String lastGhostKey = null;
     private final int SIZE = 8;
     private Fleet_Layout fleet_layout;
     private DefaultFleet fleet;
     private boolean[][] occupied = new boolean[SIZE][SIZE];
+    private Ship_Placement selected_ship_placement = null;
+    private boolean isLocked = false; // locking ships
+
+    // check for AI shots
+    private final boolean[][] firedOnPlayer = new boolean[SIZE][SIZE];
+    private final Map<Point, Ship_Placement> pointToShip = new HashMap<>();
+    private final Map<Ship_Placement, Integer> shipHP = new HashMap<>();
+
+    private final Color shotColorMiss = Color.DARK_GRAY;
+    private final Color shotColorHit = Color.GREEN;
+    private final Color shotColorPartial = Color.YELLOW;
+
+    public boolean isLocked() { return isLocked; }
 
     // map to remember which tiles were painted for each committed Ship_Placement
     private final Map<Ship_Placement, List<Point>> placedMap = new HashMap<>();
 
+    private Frames parentFrame;
+
     JPanel grid = new JPanel(new GridLayout(SIZE, SIZE, 2, 2)) {
-        @Override
-        public Dimension getPreferredSize() {
+        @Override public Dimension getPreferredSize() {
             return new Dimension(2560, 1280);
         }
     };
 
-    public GameLayout(Frame frame) {
+    public GameLayout(Frames frame) {
+        this.parentFrame = frame;
         setLayout(new BorderLayout());
+        setOpaque(false);
         add(createBoardPanel(), BorderLayout.CENTER);
         fleet = new DefaultFleet();
         fleet_layout = new Fleet_Layout(fleet, this);
+        fleet_layout.setOpaque(false); // Make fleet layout transparent
         add(fleet_layout, BorderLayout.EAST);
+    }
+
+    /**
+     * Called by Skill_Dialogs (or Frames) when player confirms skills.
+     * We register skills into the global SkillsRegistry so ModifiedStats can read them.
+     */
+
+
+    public List<Ship_Placement> getPlacements() {
+        return new ArrayList<>(placedMap.keySet());
     }
 
     private JPanel createBoardPanel() {
         JPanel outer = new JPanel(new BorderLayout());
+        outer.setOpaque(false);
         JPanel boardPanel = new JPanel(new BorderLayout());
+        boardPanel.setOpaque(false);
 
         // Top column labels
         JPanel top = new JPanel(new GridLayout(1, SIZE + 1));
+        top.setOpaque(false);
         top.add(new JLabel()); // top-left empty corner
         for (int c = 0; c < SIZE; c++) {
             JLabel lbl = new JLabel(String.valueOf((char) ('A' + c)), SwingConstants.CENTER);
@@ -52,7 +95,9 @@ public class GameLayout extends JPanel {
 
         // Left row labels + grid
         JPanel center = new JPanel(new BorderLayout());
+        center.setOpaque(false);
         JPanel leftLabels = new JPanel(new GridLayout(SIZE, 1));
+        leftLabels.setOpaque(false);
         for (int r = 1; r <= SIZE; r++) {
             JLabel lbl = new JLabel(String.valueOf(r), SwingConstants.CENTER);
             lbl.setFont(lbl.getFont().deriveFont(Font.BOLD, 14f));
@@ -92,11 +137,14 @@ public class GameLayout extends JPanel {
                 grid.add(cell);
             }
         }
+        
+        grid.setOpaque(false);
 
         center.add(grid, BorderLayout.CENTER);
         boardPanel.add(center, BorderLayout.CENTER);
 
         JPanel wrapper = new JPanel(new GridBagLayout()); // centers its child
+        wrapper.setOpaque(false);
         Dimension fixed = new Dimension(800, 800);
         boardPanel.setPreferredSize(fixed);
         boardPanel.setMinimumSize(fixed);
@@ -107,21 +155,31 @@ public class GameLayout extends JPanel {
 
         // Ensure ghost clears when the drag leaves the grid
         new DropTarget(grid, new java.awt.dnd.DropTargetListener() {
-            @Override public void dragEnter(java.awt.dnd.DropTargetDragEvent dtde) { }
-            @Override public void dragOver(java.awt.dnd.DropTargetDragEvent dtde) { }
-            @Override public void dropActionChanged(java.awt.dnd.DropTargetDragEvent dtde) { }
+            @Override public void dragEnter(java.awt.dnd.DropTargetDragEvent dtde) {}
+            @Override public void dragOver(java.awt.dnd.DropTargetDragEvent dtde) {}
+            @Override public void dropActionChanged(java.awt.dnd.DropTargetDragEvent dtde) {}
             @Override public void drop(java.awt.dnd.DropTargetDropEvent dtde) {
-                // drop will be handled by TransferHandler.importData; clear ghost afterwards
                 clearGhost();
                 lastGhostKey = null;
             }
             @Override public void dragExit(java.awt.dnd.DropTargetEvent dte) {
-                // clear ghost when leaving the grid entirely
                 clearGhost();
                 lastGhostKey = null;
             }
         });
 
+        JPanel controlRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 6));
+        controlRow.setOpaque(false);
+        JButton confirmBtn = new JButton("Confirm Positions");
+        confirmBtn.addActionListener(e -> {
+            if (!isLocked) {
+                lockPlacements();
+                confirmBtn.setEnabled(false); // prevent double-confirm
+            }
+        });
+        controlRow.add(confirmBtn);
+
+        outer.add(controlRow, BorderLayout.SOUTH);
         return outer;
     }
 
@@ -154,12 +212,15 @@ public class GameLayout extends JPanel {
     }
 
     /**
-     * Paint ship tiles (public so CellTransferHandler can call commitPlacement which calls this).
+     * Paint ship tiles
      */
     public void paintShip(Ship_Placement sp, boolean ghost) {
-        int tileSize = 150;
+        // calculate tile size dynamically based on the grid component size
+        int w = grid.getComponent(0).getWidth();
+        int h = grid.getComponent(0).getHeight();
+        int tileSize = (w > 0 && h > 0) ? Math.min(w, h) : 90; // fallback to 90 if not visible yet
 
-        // If committing, clear any previously painted tiles for this same ship
+        // if committing, clear any previously painted tiles for this same ship
         if (!ghost) {
             List<Point> prev = placedMap.remove(sp);
             if (prev != null) {
@@ -174,6 +235,12 @@ public class GameLayout extends JPanel {
                         cell.putClientProperty("ship", null);
                         occupied[p.y][p.x] = false;
                     }
+                    cell.addActionListener(e -> {
+                        Object ship = cell.getClientProperty("ship");
+                        if (ship instanceof Ship_Placement) {
+                            selected_ship_placement = (Ship_Placement) ship;
+                        }
+                    });
                 }
             }
         }
@@ -250,11 +317,15 @@ public class GameLayout extends JPanel {
                 return; // no change
             }
             lastGhostKey = key;
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) {
+        }
 
         clearGhost(); // remove old preview
 
-        int tileSize = 150;
+        // calculate tile size dynamically based on the grid component size
+        int w = grid.getComponent(0).getWidth();
+        int h = grid.getComponent(0).getHeight();
+        int tileSize = (w > 0 && h > 0) ? Math.min(w, h) : 90; // fallback to 90 if not visible yet
         ImageIcon fullIcon = new ImageIcon(getClass().getResource(sp.getShip().getImage()));
         Image fullImage = fullIcon.getImage();
 
@@ -334,5 +405,169 @@ public class GameLayout extends JPanel {
                 occupied[p.y][p.x] = false;
             }
         }
+    }
+
+    public DefaultFleet getFleet() {
+        return fleet;
+    }
+
+    // if hit, our ship gets lit up also
+    private void revealShipTiles(Ship_Placement ship, Color color, boolean markFired) {
+        if (ship == null) return;
+        List<Point> tiles = placedMap.getOrDefault(ship, ship.getOccupiedTiles());
+        for (Point tile : tiles) {
+            int tx = tile.x;
+            int ty = tile.y;
+            if (tx < 0 || tx >= SIZE || ty < 0 || ty >= SIZE) continue;
+            JButton cell = (JButton) grid.getComponent(ty * SIZE + tx);
+            cell.setBackground(color);
+            cell.setEnabled(!markFired);
+            if (markFired) {
+                firedOnPlayer[ty][tx] = true;
+            }
+        }
+    }
+
+    // lock ships
+    public void lockPlacements() {
+        isLocked = true;
+        clearGhost();
+        lastGhostKey = null;
+
+        // Disable drag on cells
+        for (int i = 0; i < grid.getComponentCount(); i++) {
+            JComponent jc = (JComponent) grid.getComponent(i);
+            jc.setTransferHandler(null);
+            for (java.awt.event.MouseMotionListener ml : jc.getMouseMotionListeners()) {
+                jc.removeMouseMotionListener(ml);
+            }
+        }
+        if (fleet_layout != null) {
+            fleet_layout.setEnabled(false);
+            fleet_layout.setVisible(false);
+        }
+        grid.setBorder(BorderFactory.createLineBorder(Color.DARK_GRAY, 2));
+
+        // Build combat maps from placed ships
+        pointToShip.clear();
+        shipHP.clear();
+        float hpMod = playerMods != null ? playerMods.hpModifier() : 1f;
+        for (Map.Entry<Ship_Placement, List<Point>> entry : placedMap.entrySet()) {
+            Ship_Placement sp = entry.getKey();
+            int baseHp = sp.getShip().getHP();
+            int modifiedHp = Math.max(1, Math.round(baseHp * hpMod));
+            shipHP.put(sp, modifiedHp);
+            for (Point p : entry.getValue()) {
+                pointToShip.put(new Point(p.x, p.y), sp);
+            }
+        }
+        for (int r = 0; r < SIZE; r++) Arrays.fill(firedOnPlayer[r], false);
+    }
+
+    /**
+     * Apply a volley of shots using attacker fleet stats and optional attacker modifiers.
+     * Uses FleetCalculation.DamageToShips(attacker, defender, attackerMods, defenderMods).
+     *
+     * Painting rules:
+     *  - miss -> DARK_GRAY, permanently fired
+     *  - hit and remaining HP > 50% -> color ALL ship tiles GREEN, keep tiles targetable
+     *  - hit and remaining HP <= 50% -> color ALL ship tiles YELLOW,keep targetable
+     *  - destroyed -> color ALL ship tiles RED, mark tiles permanently fired
+     */
+    public void applyShots(List<Point> shots, List<Ship_Placement> attackerFleet, ModifiedStats attackerMods) {
+        if (shots == null || shots.isEmpty()) return;
+        List<Point> incoming = new ArrayList<>(shots);
+
+
+        shots = incoming;
+
+        List<Ship_Placement> defenderPlacements = new ArrayList<>(placedMap.keySet());
+
+        // Decide damage path:
+        // - if attackerMods provided -> use player-aware DamageToShips (attacker is player)
+        // - otherwise -> use default AI damage path DamageFromShips
+        float dmgFloat;
+        ModifiedStats defenderMods = new ModifiedStats();
+
+        // AI/default damage path (attacker is opponent)
+        dmgFloat = Ships.FleetCalculation.DamageFromShips(attackerFleet, defenderPlacements,defenderMods );
+
+
+        int damagePerHit = dmgFloat > 0f ? Math.max(1, Math.round(dmgFloat)) : 0;
+        for (skills.Defender_Skills_Instance si : skills.Defender_SkillsRegistry.getSelectedInstances()) {
+            if (!si.isActive()) continue;
+            si.consumeUse();
+        }
+
+
+        for (Point p : shots) {
+            int col = p.x, row = p.y;
+            if (col < 0 || col >= SIZE || row < 0 || row >= SIZE) continue;
+
+            // Skip permanently fired tiles
+            if (firedOnPlayer[row][col]) continue;
+
+            JButton cell = (JButton) grid.getComponent(row * SIZE + col);
+            Ship_Placement hitShip = pointToShip.get(new Point(col, row));
+
+            if (hitShip == null) {
+                // miss -> permanently mark fired and disable
+                firedOnPlayer[row][col] = true;
+                cell.setBackground(shotColorMiss);
+                cell.setEnabled(false);
+                continue;
+            }
+
+            // hit: reduce HP and color according to remaining percent
+            int remaining = shipHP.getOrDefault(hitShip, hitShip.getShip().getHP());
+            int damage = Math.max(0, damagePerHit); // allow zero if penetration failed
+            remaining -= damage;
+            shipHP.put(hitShip, remaining);
+
+
+            int initialHP = hitShip.getShip().getHP();
+            float pct = (float) remaining / (float) initialHP;
+
+            if (remaining <= 0) {
+                // destroyed -> reveal whole ship red and mark all tiles fired
+                revealShipTiles(hitShip, Color.RED, true);
+            } else if (pct <= 0.5f) {
+                // ≤50% -> reveal whole ship yellow and mark all tiles fired
+                revealShipTiles(hitShip, shotColorPartial, false);
+            } else {
+                // >50% -> reveal whole ship green but keep tiles targetable
+                revealShipTiles(hitShip, shotColorHit, false);
+            }
+        }
+        endPlayerTurn();
+    }
+    public void endPlayerTurn() {
+        // decrement durations and remove expired instances
+        skills.Attacker_SkillsRegistry.tickTurnAll();
+        skills.Defender_SkillsRegistry.tickTurnAll();
+
+        // then run AI or next phase
+        // startAiTurn();
+    }
+    // Backwards-compatible overloads
+    public void applyShots(List<Point> shots, List<Ship_Placement> attackerFleet) {
+        applyShots(shots, attackerFleet, null);
+    }
+
+    public void applyShots(List<Point> shots) {
+        applyShots(shots, (List<Ship_Placement>) null, null);
+    }
+
+    private boolean checkLossCondition() {
+        // If map is empty, game hasn't really started or ships are gone
+        if (shipHP.isEmpty() && isLocked) return true; // Empty map after locking means death
+        if (shipHP.isEmpty()) return false; // Not locked yet
+
+        for (int hp : shipHP.values()) {
+            if (hp > 0) {
+                return false; // Player still has a ship
+            }
+        }
+        return true; // All player ships dead
     }
 }
