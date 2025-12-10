@@ -2,7 +2,7 @@ package skills;
 
 import com.bb.GameLayout;
 
-public class modify_HP implements Skills {
+public class modify_HP implements Defender_Skills {
     @Override
     public String getName() {
         return "up HP";
@@ -22,4 +22,19 @@ public class modify_HP implements Skills {
     public float modify_HP() {
         return 2.0f;
     }
+    public float modify_shield() {
+        return 1f;
+    }
+    @Override
+    public int modify_level() {
+        return 1;
+    }
+    @Override
+    public int  usage() {
+        return 0;
+    }
+    public int turns() {
+        return 0;
+    }
+
 }
