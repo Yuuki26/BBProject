@@ -2,22 +2,24 @@ package com.bb;
 
 import Ships.*;
 import skills.ModifiedStats;
-import skills.Skills;
-import skills.SkillsRegistry;
+
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.dnd.DropTarget;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionAdapter;
+import java.awt.event.MouseMotionListener;
 import java.awt.image.BufferedImage;
+import java.io.Serializable;
 import java.util.*;
 import java.util.List;
 
 public class GameLayout extends JPanel {
 
     // Keep a local copy of selected skills (for reference) but ModifiedStats reads the registry.
-    private List<Skills> activeSkills = new ArrayList<>();
+
     private final ModifiedStats playerMods = new ModifiedStats(); // reads SkillsRegistry internally
 
     public ModifiedStats getPlayerModifiers() { return playerMods; }
@@ -68,11 +70,7 @@ public class GameLayout extends JPanel {
      * Called by Skill_Dialogs (or Frames) when player confirms skills.
      * We register skills into the global SkillsRegistry so ModifiedStats can read them.
      */
-    public void setActiveSkills(List<Skills> skills) {
-        this.activeSkills = skills != null ? new ArrayList<>(skills) : new ArrayList<>();
-        SkillsRegistry.setSelectedSkills(this.activeSkills);
-        // playerMods reads registry dynamically, no need to re-create it
-    }
+
 
     public List<Ship_Placement> getPlacements() {
         return new ArrayList<>(placedMap.keySet());
@@ -478,6 +476,10 @@ public class GameLayout extends JPanel {
      */
     public void applyShots(List<Point> shots, List<Ship_Placement> attackerFleet, ModifiedStats attackerMods) {
         if (shots == null || shots.isEmpty()) return;
+        List<Point> incoming = new ArrayList<>(shots);
+
+
+        shots = incoming;
 
         List<Ship_Placement> defenderPlacements = new ArrayList<>(placedMap.keySet());
 
@@ -485,16 +487,18 @@ public class GameLayout extends JPanel {
         // - if attackerMods provided -> use player-aware DamageToShips (attacker is player)
         // - otherwise -> use default AI damage path DamageFromShips
         float dmgFloat;
-        if (attackerMods != null) {
-            // attacker provided modifiers (player attack scenario)
-            Ships.FleetCalculation calc = new Ships.FleetCalculation(attackerFleet, attackerMods);
-            dmgFloat = calc.DamageToShips();
-        } else {
-            // AI/default damage path (attacker is opponent)
-            dmgFloat = Ships.FleetCalculation.DamageFromShips(attackerFleet, defenderPlacements);
-        }
+        ModifiedStats defenderMods = new ModifiedStats();
+
+        // AI/default damage path (attacker is opponent)
+        dmgFloat = Ships.FleetCalculation.DamageFromShips(attackerFleet, defenderPlacements,defenderMods );
+
 
         int damagePerHit = dmgFloat > 0f ? Math.max(1, Math.round(dmgFloat)) : 0;
+        for (skills.Defender_Skills_Instance si : skills.Defender_SkillsRegistry.getSelectedInstances()) {
+            if (!si.isActive()) continue;
+            si.consumeUse();
+        }
+
 
         for (Point p : shots) {
             int col = p.x, row = p.y;
@@ -520,6 +524,7 @@ public class GameLayout extends JPanel {
             remaining -= damage;
             shipHP.put(hitShip, remaining);
 
+
             int initialHP = hitShip.getShip().getHP();
             float pct = (float) remaining / (float) initialHP;
 
@@ -534,12 +539,16 @@ public class GameLayout extends JPanel {
                 revealShipTiles(hitShip, shotColorHit, false);
             }
         }
-
-        if (checkLossCondition()) {
-            if (parentFrame != null) parentFrame.triggerGameOver(false); // Player Lost
-        }
+        endPlayerTurn();
     }
+    public void endPlayerTurn() {
+        // decrement durations and remove expired instances
+        skills.Attacker_SkillsRegistry.tickTurnAll();
+        skills.Defender_SkillsRegistry.tickTurnAll();
 
+        // then run AI or next phase
+        // startAiTurn();
+    }
     // Backwards-compatible overloads
     public void applyShots(List<Point> shots, List<Ship_Placement> attackerFleet) {
         applyShots(shots, attackerFleet, null);
