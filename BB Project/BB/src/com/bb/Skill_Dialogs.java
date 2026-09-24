@@ -141,7 +141,7 @@ public class Skill_Dialogs extends JPanel {
     /** Loads and scales a skill icon, or returns null when the art is missing. */
     private ImageIcon loadIcon(String resourcePath, int width, int height) {
         String path = resourcePath.startsWith("/") ? resourcePath : "/" + resourcePath;
-        java.net.URL url = getClass().getResource(path);
+        java.net.URL url = Assets.getResource(path);
         if (url == null) {
             System.err.println("Skill icon not found on the classpath: " + path);
             return null;

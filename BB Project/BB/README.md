@@ -10,13 +10,19 @@ run.
 run.bat
 ```
 
-Or from an IDE, run `com.bb.Main`.
+Or from an IDE: open the `BB` folder as the project and run `com.bb.Main`. **No classpath
+setup needed** — just Run.
 
-**`lib` has to be on the classpath.** Every image is loaded through
-`getResource("/ships/...")`, `getResource("/background.png")` and similar, so `lib` is a
-resource root, not just a dependency folder. `run.bat` and the supplied VS Code launch
-configuration both handle this; a hand-rolled run configuration that omits it will start the
-game with no art.
+Art loads through `com.bb.Assets.getResource(...)`, not a raw `getClass().getResource(...)`.
+It checks the classpath first, and if that comes up empty (which it will for a plain "Run"
+with no project configuration, since `lib` holds images, not classes, and nothing puts it on
+the classpath automatically) it searches the filesystem instead: starting from the working
+directory and from wherever the running code itself lives, walking upward a few levels from
+each looking for a sibling `lib`. Between those two starting points, that covers both "IDE
+default working directory = project root" (true of VS Code, IntelliJ and Eclipse out of the
+box) and "run from somewhere unrelated entirely" (the code's own location still finds its way
+back). If art still doesn't load, the error printed to stderr names the working directory it
+searched from — open an issue with that line if it happens.
 
 ## Checking it still works
 

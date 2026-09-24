@@ -18,7 +18,7 @@ public class Frames extends JFrame {
         private Image bgImage;
         {
             try {
-                java.net.URL url = getClass().getResource("/background.png");
+                java.net.URL url = Assets.getResource("/background.png");
                 if (url != null) {
                     bgImage = javax.imageio.ImageIO.read(url);
                 } else {

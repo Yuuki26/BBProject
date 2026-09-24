@@ -120,7 +120,7 @@ public class RewardPanel extends JPanel {
     private ImageIcon loadIcon(String path, int w, int h) {
         if (path == null) return null;
         String resource = path.startsWith("/") ? path : "/" + path;
-        java.net.URL url = getClass().getResource(resource);
+        java.net.URL url = Assets.getResource(resource);
         if (url == null) return null;
         Image scaled = new ImageIcon(url).getImage().getScaledInstance(w, h, Image.SCALE_SMOOTH);
         return new ImageIcon(scaled);

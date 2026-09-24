@@ -1,5 +1,6 @@
 package Ships;
 
+import com.bb.Assets;
 import com.bb.GameLayout;
 
 import javax.swing.*;
@@ -177,7 +178,7 @@ public class Fleet_Layout extends JPanel {
     }
 
     private ImageIcon loadScaled(String path, int width, int height) {
-        java.net.URL url = getClass().getResource(path);
+        java.net.URL url = Assets.getResource(path);
         if (url == null) {
             System.err.println("Ship image not found on the classpath: " + path);
             return null;

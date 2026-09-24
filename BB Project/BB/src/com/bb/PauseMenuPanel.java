@@ -100,7 +100,7 @@ public class PauseMenuPanel extends JPanel {
     }
 
     private ImageIcon loadIcon(String path) {
-        URL url = getClass().getResource(path);
+        URL url = Assets.getResource(path);
         return url != null ? new ImageIcon(url) : null;
     }
 

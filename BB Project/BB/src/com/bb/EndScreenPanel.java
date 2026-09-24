@@ -92,7 +92,7 @@ public class EndScreenPanel extends JPanel {
 
     private BufferedImage loadImg(String path) {
         try {
-            URL url = getClass().getResource(path);
+            URL url = Assets.getResource(path);
             if (url == null) {
                 System.err.println("Resource not found: " + path);
                 return null;
@@ -105,7 +105,7 @@ public class EndScreenPanel extends JPanel {
     }
 
     private ImageIcon loadIcon(String path) {
-        URL url = getClass().getResource(path);
+        URL url = Assets.getResource(path);
         if (url == null) return null;
         return new ImageIcon(url);
     }

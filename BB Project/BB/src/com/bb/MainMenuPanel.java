@@ -40,7 +40,7 @@ public class MainMenuPanel extends JPanel {
         private int lastScaledH = -1;
 
         private Image loadImage(String path) {
-            java.net.URL url = MainMenuPanel.class.getResource(path);
+            java.net.URL url = Assets.getResource(path);
             if (url == null) {
                 System.err.println("Image couldn't be found: " + path);
                 return null;

@@ -578,9 +578,11 @@ public class SelfTest {
         header("16. Skill catalogue and art");
         eq("all skills registered", Skills_Register.getAllSkills().size(), 8);
         for (Skills s : Skills_Register.getAllSkills()) {
-            java.net.URL url = SelfTest.class.getResource("/" + s.getImage());
-            check("icon on the classpath for " + s.getName() + " (" + s.getImage() + ")",
-                    url != null);
+            // Assets.getResource, not a raw classpath lookup: this is the same path every
+            // real load goes through, including the filesystem fallback that lets the game
+            // find its art without lib/ having to be added to the classpath by hand.
+            java.net.URL url = com.bb.Assets.getResource("/" + s.getImage());
+            check("art found for " + s.getName() + " (" + s.getImage() + ")", url != null);
         }
 
         System.out.println();

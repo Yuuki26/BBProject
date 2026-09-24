@@ -6,22 +6,14 @@
             "name": "Battleship",
             "request": "launch",
             "mainClass": "com.bb.Main",
-            "projectName": "BB",
-            "classPaths": [
-                "$Auto",
-                "${workspaceFolder}/lib"
-            ]
+            "projectName": "BB"
         },
         {
             "type": "java",
             "name": "Battleship self-test",
             "request": "launch",
             "mainClass": "Test.SelfTest",
-            "projectName": "BB",
-            "classPaths": [
-                "$Auto",
-                "${workspaceFolder}/lib"
-            ]
+            "projectName": "BB"
         }
     ]
 }
