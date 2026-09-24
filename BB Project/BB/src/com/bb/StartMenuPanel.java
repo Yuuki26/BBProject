@@ -6,17 +6,17 @@ import java.net.URL;
 
 public class StartMenuPanel extends JPanel {
 
-    private JLabel titleImageSlot;
+    private final CardLayout cardLayout;
+    private final JPanel cardPanel;
+    private final Frames frames;
 
-    private JButton startButton;
-    private JButton exitButton;
+    private final JButton loadButton;
 
-    private CardLayout cardLayout;
-    private JPanel cardPanel;
-
-    public StartMenuPanel(CardLayout cl, JPanel cards) {
+    public StartMenuPanel(CardLayout cl, JPanel cards, Frames frames) {
         this.cardLayout = cl;
         this.cardPanel = cards;
+        this.frames = frames;
+
         setLayout(new GridBagLayout());
         setOpaque(false);
 
@@ -25,50 +25,65 @@ public class StartMenuPanel extends JPanel {
         gbc.gridx = 0;
         gbc.anchor = GridBagConstraints.CENTER;
 
-        //  Title Image
-        titleImageSlot = new JLabel();
+        // Title image
+        JLabel titleImageSlot = new JLabel();
         ImageIcon titleIcon = loadIcon("/ui/title.png");
         if (titleIcon != null) {
             titleImageSlot.setIcon(titleIcon);
         } else {
-            titleImageSlot.setText("Missing: /images/title.png");
+            titleImageSlot.setText("BATTLESHIP");
             titleImageSlot.setForeground(Color.WHITE);
-            titleImageSlot.setFont(new Font("SansSerif", Font.BOLD, 24));
-            titleImageSlot.setBorder(BorderFactory.createLineBorder(Color.WHITE));
+            titleImageSlot.setFont(new Font("SansSerif", Font.BOLD, 44));
             titleImageSlot.setPreferredSize(new Dimension(400, 100));
             titleImageSlot.setHorizontalAlignment(SwingConstants.CENTER);
         }
         gbc.gridy = 0;
         add(titleImageSlot, gbc);
 
-
-        // Buttons
-        JPanel buttonPanel = new JPanel(new GridLayout(2, 1, 10, 10));
+        JPanel buttonPanel = new JPanel(new GridLayout(3, 1, 10, 10));
         buttonPanel.setOpaque(false);
 
-        startButton = createImageButton("/ui/Start_BTN.png", "Start Game");
-        startButton.addActionListener(e -> cardLayout.show(cardPanel, "Skills"));
+        JButton startButton = createImageButton("/ui/Start_BTN.png", "New Run");
+        startButton.addActionListener(e -> {
+            if (frames != null) {
+                frames.startNewRun();
+            } else {
+                cardLayout.show(cardPanel, "Skills");
+            }
+        });
 
-        exitButton = createImageButton("/ui//Exit_BTN.png", "Exit");
+        loadButton = createImageButton(null, "Load Game");
+        loadButton.addActionListener(e -> {
+            if (frames != null) frames.promptLoad();
+        });
+
+        JButton exitButton = createImageButton("/ui/Exit_BTN.png", "Exit");
         exitButton.addActionListener(e -> System.exit(0));
 
         buttonPanel.add(startButton);
+        buttonPanel.add(loadButton);
         buttonPanel.add(exitButton);
 
-        gbc.gridy = 2;
+        gbc.gridy = 1;
         add(buttonPanel, gbc);
+    }
+
+    @Override
+    public void addNotify() {
+        super.addNotify();
+        // Only offer Load when there is actually something to load.
+        if (frames != null) loadButton.setEnabled(frames.hasAnySave());
     }
 
     private JButton createImageButton(String path, String fallbackText) {
         JButton btn = new JButton();
-        ImageIcon icon = loadIcon(path);
+        ImageIcon icon = path == null ? null : loadIcon(path);
         if (icon != null) {
             btn.setIcon(icon);
             btn.setBorderPainted(false);
             btn.setContentAreaFilled(false);
             btn.setFocusPainted(false);
             btn.setOpaque(false);
-            // Optionally set a rollover icon if you have one (e.g., path + "_hover.png")
         } else {
             btn.setText(fallbackText);
             btn.setFont(new Font("SansSerif", Font.BOLD, 18));
@@ -80,9 +95,6 @@ public class StartMenuPanel extends JPanel {
 
     private ImageIcon loadIcon(String path) {
         URL url = getClass().getResource(path);
-        if (url != null) {
-            return new ImageIcon(url);
-        }
-        return null;
+        return url != null ? new ImageIcon(url) : null;
     }
 }

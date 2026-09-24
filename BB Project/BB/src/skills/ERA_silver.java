@@ -3,14 +3,14 @@ package skills;
 public class ERA_silver implements Defender_Skills{
     @Override
     public String getName() {
-        return "ERA";
+        return "ERA Silver";
     }
     public String getDescription() {
         return "Blocks 2 salvos for 3 turn";
     }
     @Override
     public String getImage() {
-        return "skills/ERA_AMOR-SILVER.png";
+        return "ERA_AMOR-SILVER.png";
     }
     @Override
     public float  modify_shield () {

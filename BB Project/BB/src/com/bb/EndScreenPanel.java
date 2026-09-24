@@ -15,7 +15,10 @@ public class EndScreenPanel extends JPanel {
     private final JButton replayBtn;
     private final JButton closeBtn;
     private final JPanel contentPane;
-    
+    private final Frames frames;
+    /** Shows how far the run got, which is the real result in a roguelike. */
+    private final JLabel runSummary = new JLabel("", SwingConstants.CENTER);
+
     // State
     private boolean isVictory = false;
     
@@ -25,15 +28,23 @@ public class EndScreenPanel extends JPanel {
     private ImageIcon winReplayIcon, winCloseIcon;
     private ImageIcon loseReplayIcon, loseCloseIcon;
 
-    public EndScreenPanel(CardLayout cl, JPanel cards) {
+    public EndScreenPanel(CardLayout cl, JPanel cards, Frames frames) {
         this.cl = cl;
         this.cards = cards;
+        this.frames = frames;
         setLayout(new GridBagLayout());
         setOpaque(false); // Make transparent so wallpaper shows through
 
         loadAssets();
 
-        replayBtn = createButton(e -> cl.show(cards, "START_MENU"));
+        // Replay starts a whole new run rather than resuming the one that just ended.
+        replayBtn = createButton(e -> {
+            if (frames != null) {
+                frames.startNewRun();
+            } else {
+                cl.show(cards, "START_MENU");
+            }
+        });
         closeBtn = createButton(e -> System.exit(0));
 
         // Custom painting panel for the window background
@@ -118,17 +129,26 @@ public class EndScreenPanel extends JPanel {
         // Set Icons
         if (isVictory) {
             if (winReplayIcon != null) replayBtn.setIcon(winReplayIcon);
-            else replayBtn.setText("Replay");
-            
+            else replayBtn.setText("New Run");
+
             if (winCloseIcon != null) closeBtn.setIcon(winCloseIcon);
             else closeBtn.setText("Close");
         } else {
             if (loseReplayIcon != null) replayBtn.setIcon(loseReplayIcon);
-            else replayBtn.setText("Retry");
-            
+            else replayBtn.setText("New Run");
+
             if (loseCloseIcon != null) closeBtn.setIcon(loseCloseIcon);
             else closeBtn.setText("Close");
         }
+
+        RunState run = RunState.current();
+        runSummary.setText("<html><div style='text-align:center'>"
+                + "Reached stage " + run.getStage()
+                + " &nbsp;|&nbsp; " + run.getStagesCleared() + " cleared"
+                + " &nbsp;|&nbsp; Score " + run.getScore()
+                + "</div></html>");
+        runSummary.setForeground(new Color(255, 225, 160));
+        runSummary.setFont(new Font("SansSerif", Font.BOLD, 20));
 
         // Calculate Scaled Dimensions
         BufferedImage bg = isVictory ? winWindow : loseWindow;
@@ -163,15 +183,21 @@ public class EndScreenPanel extends JPanel {
         
         GridBagConstraints gbc = new GridBagConstraints();
         
-        // Spacer to push buttons down
+        // Spacer to push the summary and buttons down
         gbc.gridx = 0;
         gbc.gridy = 0;
         gbc.gridwidth = 2;
-        gbc.weighty = 1.0; 
+        gbc.weighty = 1.0;
         contentPane.add(Box.createGlue(), gbc);
 
-        // Buttons row
+        // Run summary, sitting just above the buttons
         gbc.gridy = 1;
+        gbc.weighty = 0;
+        gbc.insets = new Insets(0, 15, 12, 15);
+        contentPane.add(runSummary, gbc);
+
+        // Buttons row
+        gbc.gridy = 2;
         gbc.weighty = 0;
         gbc.gridwidth = 1;
         // Adjust insets scaled roughly

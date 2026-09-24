@@ -6,16 +6,29 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
-public class NormalEnenmy {
+/**
+ * The baseline opponent: fires at uniformly random tiles it has not tried yet.
+ *
+ * <p>It ignores {@link #reportResults}, so it never follows up on a hit. {@link EliteEnemy}
+ * is the one that searches.
+ */
+public class NormalEnenmy implements EnemyAI {
+
     private final int board;
-    private final Random random=new Random();
+    private final Random random = new Random();
+    private final boolean[][] hasfired;
 
-    private final boolean[][]hasfired;
-
-    public NormalEnenmy(int board){
-        this.board=board;
-        this.hasfired=new boolean[board][board];
+    public NormalEnenmy(int board) {
+        this.board = board;
+        this.hasfired = new boolean[board][board];
     }
+
+    @Override
+    public String getName() {
+        return "Standard";
+    }
+
+    @Override
     public List<Point> generateShots(int maxShots) {
         List<Point> available = new ArrayList<>();
         for (int r = 0; r < board; r++) {
@@ -36,5 +49,4 @@ public class NormalEnenmy {
         }
         return chosen;
     }
-
 }

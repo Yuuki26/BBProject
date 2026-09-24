@@ -1,7 +1,5 @@
 package skills;
 
-import com.bb.GameLayout;
-
 public class modify_DMG implements Attacker_Skills {
     @Override
     public String getName() {
@@ -10,7 +8,7 @@ public class modify_DMG implements Attacker_Skills {
 
     @Override
     public String getDescription() {
-        return "Increases Damage";
+        return "Increases damage by 30%, permanent";
     }
 
     @Override
@@ -27,14 +25,15 @@ public class modify_DMG implements Attacker_Skills {
     public int modify_level() {
         return 1;
     }
+
+    /** Passive: unlimited uses, never expires. */
     @Override
-    public int  usage() {
-        return 1;
+    public int usage() {
+        return -1;
     }
+
+    @Override
     public int turns() {
-        return 0;
+        return -1;
     }
-
-
-
 }

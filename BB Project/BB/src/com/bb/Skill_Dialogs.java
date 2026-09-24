@@ -2,7 +2,7 @@ package com.bb;
 
 import skills.Skills;
 import skills.SkillsRegistry;
-import skills.Skils_register;
+import skills.Skills_Register;
 
 
 import javax.swing.*;
@@ -41,20 +41,26 @@ public class Skill_Dialogs extends JPanel {
         title.setForeground(Color.WHITE); // Make text white to be visible on background
         add(title, BorderLayout.NORTH);
 
-        List<Skills> allSkills = Skils_register.getAllSkills();
+        List<Skills> allSkills = Skills_Register.getAllSkills();
 
         for (Skills s : allSkills) {
             String imagePath = s.getImage();
             ImageIcon icon = loadIcon(imagePath, 180, 180);
             ImageIcon fadeIcon = Fade(icon, 0.45f);
 
-            JToggleButton btn = new JToggleButton(icon);
+            JToggleButton btn = new JToggleButton();
+            if (icon != null) {
+                btn.setIcon(icon);
+            } else {
+                // Missing art must not make the skill unpickable, so fall back to its name.
+                btn.setText("<html><div style='text-align:center'>" + s.getName() + "</div></html>");
+            }
             btn.setPreferredSize(new Dimension(180, 180));
-            btn.setToolTipText(s.getName());
+            btn.setToolTipText(s.getDescription());
             btn.setFocusPainted(false);
 
             btn.addItemListener(e -> {
-                btn.setSelectedIcon(fadeIcon);
+                if (fadeIcon != null) btn.setSelectedIcon(fadeIcon);
 
                 long selectedCount = buttons.stream().filter(AbstractButton::isSelected).count();
                 if (btn.isSelected() && selectedCount > 2) {
@@ -115,6 +121,13 @@ public class Skill_Dialogs extends JPanel {
         cl.show(cards, "PLAYER");
     }
 
+    /** Unticks every skill so a new run starts from a clean picker. */
+    public void clearSelection() {
+        for (JToggleButton btn : buttons) {
+            btn.setSelected(false);
+        }
+    }
+
     public List<Skills> getSelectedSkills() {
         List<Skills> selected = new ArrayList<>();
         for (JToggleButton btn : buttons) {
@@ -125,19 +138,34 @@ public class Skill_Dialogs extends JPanel {
         return selected;
     }
 
+    /** Loads and scales a skill icon, or returns null when the art is missing. */
     private ImageIcon loadIcon(String resourcePath, int width, int height) {
-        java.net.URL url = getClass().getResource("/" + resourcePath);
+        String path = resourcePath.startsWith("/") ? resourcePath : "/" + resourcePath;
+        java.net.URL url = getClass().getResource(path);
         if (url == null) {
-            System.out.println("Path not found: " + resourcePath);
-            return new ImageIcon();
+            System.err.println("Skill icon not found on the classpath: " + path);
+            return null;
         }
         ImageIcon raw = new ImageIcon(url);
+        if (raw.getImage() == null || raw.getIconWidth() <= 0) {
+            System.err.println("Skill icon could not be decoded: " + path);
+            return null;
+        }
         Image scaled = raw.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH);
         return new ImageIcon(scaled);
     }
 
+    /**
+     * Returns a dimmed copy used as the "selected" icon.
+     *
+     * <p>Returns null for a null input: previously a missing icon reached here as an empty
+     * {@code ImageIcon} whose backing image is null, and dereferencing it threw an NPE that
+     * killed the whole window during construction.
+     */
     private ImageIcon Fade(ImageIcon original, float brightnessFactor) {
+        if (original == null) return null;
         Image img = original.getImage();
+        if (img == null || img.getWidth(null) <= 0 || img.getHeight(null) <= 0) return null;
         BufferedImage buffered = new BufferedImage(
                 img.getWidth(null), img.getHeight(null), BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2d = buffered.createGraphics();

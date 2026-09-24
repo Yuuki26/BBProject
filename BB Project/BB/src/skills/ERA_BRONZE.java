@@ -1,18 +1,17 @@
 package skills;
 
-import com.bb.GameLayout;
 
-public class ERA_BRONZE implements Defender_Skills{
+public class ERA_BRONZE implements Defender_Skills {
     @Override
     public String getName() {
-        return "ERA";
+        return "ERA Bronze";
     }
     public String getDescription() {
         return "Blocks 1 salvos for 3 turn";
     }
     @Override
     public String getImage() {
-        return "skills/ERA_AMOR-BRONZE.png";
+        return "ERA_AMOR-BRONZE.png";
     }
     @Override
     public float  modify_shield () {

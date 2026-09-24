@@ -1,15 +1,11 @@
 package skills;
 
-import java.io.Serializable;
+/** Defensive skills: they change how much punishment the player's fleet absorbs. */
+public interface Defender_Skills extends Skills {
 
-public interface Defender_Skills extends Serializable {
-    String getName();
-    String getDescription();
-    String getImage();
+    /** Multiplier applied to the fleet's effective shields. {@code 1f} means no change. */
     float modify_shield();
-    float modify_HP();
-    int usage();
-    int turns();
-    int modify_level();
 
+    /** Multiplier applied to the fleet's hull points. {@code 1f} means no change. */
+    float modify_HP();
 }

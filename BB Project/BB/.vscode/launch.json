@@ -1,0 +1,27 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Battleship",
+            "request": "launch",
+            "mainClass": "com.bb.Main",
+            "projectName": "BB",
+            "classPaths": [
+                "$Auto",
+                "${workspaceFolder}/lib"
+            ]
+        },
+        {
+            "type": "java",
+            "name": "Battleship self-test",
+            "request": "launch",
+            "mainClass": "Test.SelfTest",
+            "projectName": "BB",
+            "classPaths": [
+                "$Auto",
+                "${workspaceFolder}/lib"
+            ]
+        }
+    ]
+}

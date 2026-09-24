@@ -1,33 +1,44 @@
 package skills;
 
-import com.bb.GameLayout;
-
 public class Rapid_Fire implements Attacker_Skills {
     @Override
     public String getName() {
         return "Rapid Fire";
     }
+
+    @Override
     public String getDescription() {
-        return "Fire 2 salvos for the cost of 3 turns";
+        return "Doubles the shots in every salvo, for 3 turns";
     }
 
     @Override
     public String getImage() {
         return "skills/Rapid_Fire.png";
     }
+
     @Override
     public float modify_DMG() {
         return 1f;
     }
-    public int modify_level(){
+
+    /** The salvo-doubling the name promises; before this the skill did nothing at all. */
+    @Override
+    public float modify_Shots() {
+        return 2f;
+    }
+
+    @Override
+    public int modify_level() {
         return 1;
     }
-    public int usage(){
-        return 0;
-    }
-    public int turns(){
-        return 0;
+
+    @Override
+    public int usage() {
+        return 1;
     }
 
-
+    @Override
+    public int turns() {
+        return 3;
+    }
 }

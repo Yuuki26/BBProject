@@ -1,37 +1,35 @@
 package Ships;
 
-public class BattleShip implements Ships_Type {
-    public int initialShield =10;
-    public int initialDMG =8;
-    public int initialShots =3;
-    public int initialHP=12;
-    public int initialPen=8;
-    public int initialDetection=5;
-    public int Size=3;
+/**
+ * Battleship (BB): the heaviest guns and the thickest belt armour in the game, and the most
+ * expensive hull to field.
+ */
+public abstract class Battleship extends AbstractShip {
+
+    /** Fixed build cost for every battleship. */
+    public static final int COST = 10;
+
+    protected Battleship(String name, ShipStats stats) {
+        super(name, stats);
+    }
+
     @Override
-    public int getShields(
-    ) {
-        return initialShield;
+    public final int getCost() {
+        return COST;
     }
-    public int getDMG(){
-        return initialDMG;
+
+    @Override
+    public String getHullClass() {
+        return "Battleship";
     }
-    public int getShots(){
-        return initialShots;
+
+    @Override
+    public String getHullCode() {
+        return "BB";
     }
-    public int getHP(){
-        return initialHP;
-    }
-    public int getPenetration(){
-        return initialPen;
-    }
-    public int DetectionRange(){
-        return initialDetection;
-    }
-    public String getImage(){
+
+    @Override
+    public String getImage() {
         return "/ships/BattleShip_Class.png";
-    }
-    public int getSize(){
-        return Size;
     }
 }

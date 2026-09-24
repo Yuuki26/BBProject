@@ -4,55 +4,70 @@ import skills.ModifiedStats;
 
 import java.util.List;
 
-public class FleetCalculation implements Calculations{
-    private final List<Ship_Placement> placements;
-    private final ModifiedStats attackerStats; // may be null
+/**
+ * Turns two fleets into a per-hit damage number.
+ *
+ * <p>The model is: take the attacker's average gun, scale it by the attacker's offensive
+ * skills, then ask how much of that average gets through the defender's average shield.
+ * The more of the attacking fleet that out-guns the shield, the less the salvo is blunted.
+ *
+ * <p>The previous version compared penetration against a hard-coded shield of {@code 0},
+ * so every ship with any penetration at all counted as a penetrator and the defender's
+ * shields - and therefore every defensive skill - had no effect on incoming damage.
+ */
+public class FleetCalculation implements Calculations {
 
-    public FleetCalculation(List<Ship_Placement> placements) {
-        this(placements, null);
+    /** Flat scaling so a single hit does not delete a ship outright. */
+    private static final float GLOBAL_SCALE = 0.8f;
+
+    private final List<Ship_Placement> attacker;
+    private final List<Ship_Placement> defender;
+    private final ModifiedStats attackerStats;
+
+    public FleetCalculation(List<Ship_Placement> attacker) {
+        this(attacker, null, null);
     }
 
-    public FleetCalculation(List<Ship_Placement> placements, ModifiedStats attackerStats) {
-        this.placements = placements;
+    public FleetCalculation(List<Ship_Placement> attacker, List<Ship_Placement> defender) {
+        this(attacker, defender, null);
+    }
+
+    public FleetCalculation(List<Ship_Placement> attacker,
+                            List<Ship_Placement> defender,
+                            ModifiedStats attackerStats) {
+        this.attacker = attacker;
+        this.defender = defender;
         this.attackerStats = attackerStats;
     }
 
+    /** Damage this fleet deals to the fleet it was constructed against. */
     @Override
     public float DamageToShips() {
-        if (placements == null || placements.isEmpty()) return 0f;
-
-        float sumDmg = 0f;
-        int aCount = 0;
-        for (Ship_Placement p : placements) {
-            Ships_Type s = p.getShip();
-            if (s == null) continue;
-            sumDmg += s.getDMG();
-            aCount++;
-        }
-        if (aCount == 0) return 0f;
-        float avgDmg = sumDmg / aCount;
-
-        // apply player modifier: prefer injected attackerStats, otherwise read registry
-        float attackerDmgMod = attackerStats != null ? attackerStats.dmgModifier()
-                : new ModifiedStats().dmgModifier();
-        avgDmg *= attackerDmgMod;
-
-        // penetration logic (unchanged)
-        float avgShieldUsed = 0f; // no defender list here
-        int penetrators = 0;
-        for (Ship_Placement p : placements) {
-            Ships_Type s = p.getShip();
-            if (s == null) continue;
-            if (s.getPenetration() > avgShieldUsed) penetrators++;
-        }
-
-        float penetratedFlag = 1f;
-        if (penetrators * 3.33f <= aCount) penetratedFlag = 0.3f;
-        else if (penetrators * 2f <= aCount) penetratedFlag = 0.5f;
-
-        return avgDmg * penetratedFlag * 0.8f;
+        ModifiedStats stats = attackerStats != null ? attackerStats : new ModifiedStats();
+        return damageBetween(attacker, defender, stats.dmgModifier(), 1f);
     }
-    public static float DamageFromShips(List<Ship_Placement> attacker, List<Ship_Placement> defender) {
+
+    /** Damage this fleet takes from the fleet it was constructed against. */
+    @Override
+    public float DamageFromShips() {
+        return damageBetween(defender, attacker, 1f, new ModifiedStats().shieldModifier());
+    }
+
+
+    /**
+     * Core damage formula, shared by both directions of fire.
+     *
+     * @param attacker      the firing fleet
+     * @param defender      the fleet being fired on; may be null or empty, which means an
+     *                      unshielded target
+     * @param dmgModifier   multiplier from the attacker's offensive skills
+     * @param shieldModifier multiplier from the defender's defensive skills
+     * @return damage applied per hit, never negative
+     */
+    public static float damageBetween(List<Ship_Placement> attacker,
+                                      List<Ship_Placement> defender,
+                                      float dmgModifier,
+                                      float shieldModifier) {
         if (attacker == null || attacker.isEmpty()) return 0f;
 
         float sumDmg = 0f;
@@ -64,22 +79,11 @@ public class FleetCalculation implements Calculations{
             aCount++;
         }
         if (aCount == 0) return 0f;
-        float avgDmg = sumDmg / aCount;
 
-        // compute defender average shield (no skill modifiers applied here)
-        float avgShield = 0f;
-        int dCount = 0;
-        if (defender != null && !defender.isEmpty()) {
-            float sumShield = 0f;
-            for (Ship_Placement sp : defender) {
-                Ships_Type s = sp.getShip();
-                if (s == null) continue;
-                sumShield += s.getShields();
-                dCount++;
-            }
-            if (dCount > 0) avgShield = sumShield / dCount;
-        }
+        float avgDmg = (sumDmg / aCount) * dmgModifier;
+        float avgShield = averageShield(defender) * shieldModifier;
 
+        // How much of the attacking fleet can actually out-gun that shield?
         int penetrators = 0;
         for (Ship_Placement sp : attacker) {
             Ships_Type s = sp.getShip();
@@ -88,15 +92,31 @@ public class FleetCalculation implements Calculations{
         }
 
         float penetratedFlag = 1f;
-        if (penetrators * 3.33f <= aCount) penetratedFlag = 0.3f;
-        else if (penetrators * 2f <= aCount) penetratedFlag = 0.5f;
+        if (penetrators * 3.33f <= aCount) {
+            penetratedFlag = 0.3f;
+        } else if (penetrators * 2f <= aCount) {
+            penetratedFlag = 0.5f;
+        }
 
-        return avgDmg * penetratedFlag * 0.8f;}
+        return Math.max(0f, avgDmg * penetratedFlag * GLOBAL_SCALE);
+    }
 
-    // keep other methods if required by Calculations
-    @Override
-    public float DamageFromShips() { return 0f; }
-    @Override
-    public int DetectionRange() { return 0; }
-};
+    /** Backwards-compatible two-fleet entry point with no skill modifiers applied. */
+    public static float DamageFromShips(List<Ship_Placement> attacker,
+                                        List<Ship_Placement> defender) {
+        return damageBetween(attacker, defender, 1f, 1f);
+    }
 
+    private static float averageShield(List<Ship_Placement> defender) {
+        if (defender == null || defender.isEmpty()) return 0f;
+        float sum = 0f;
+        int count = 0;
+        for (Ship_Placement sp : defender) {
+            Ships_Type s = sp.getShip();
+            if (s == null) continue;
+            sum += s.getShields();
+            count++;
+        }
+        return count == 0 ? 0f : sum / count;
+    }
+}

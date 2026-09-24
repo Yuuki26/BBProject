@@ -1,8 +1,6 @@
 package skills;
 
-import com.bb.GameLayout;
-
-public class Enhance  implements Attacker_Skills {
+public class Enhance implements Attacker_Skills {
     @Override
     public String getName() {
         return "Enhance";
@@ -10,7 +8,7 @@ public class Enhance  implements Attacker_Skills {
 
     @Override
     public String getDescription() {
-        return "Your Bullets Penetrates More";
+        return "Your bullets penetrate more (+50% damage, permanent)";
     }
 
     @Override
@@ -21,19 +19,21 @@ public class Enhance  implements Attacker_Skills {
     @Override
     public float modify_DMG() {
         return 1.5f;
-
     }
 
+    /** Passive: unlimited uses, never expires. */
+    @Override
     public int usage() {
-        return 0;
+        return -1;
     }
 
+    @Override
     public int turns() {
-        return 0;
+        return -1;
     }
 
+    @Override
     public int modify_level() {
         return 1;
     }
 }
-
