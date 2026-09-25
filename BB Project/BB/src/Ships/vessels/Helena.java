@@ -7,7 +7,8 @@ import Ships.ShipStats;
 public class Helena extends LightCruiser {
     public Helena() {
         super("Helena", new ShipStats()
-                .hp(6).shields(3).dmg(5).shots(3)
-                .penetration(3).detection(4).size(3));
+                .hp(600).shields(30).dmg(100).shots(3)
+                .penetration(30).detection(4).size(3).cost(4)
+                .image("/ships/vessels/Helena.png"));
     }
 }

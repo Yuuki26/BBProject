@@ -1,5 +1,6 @@
 package com.bb;
 
+import skills.SkillPool;
 import skills.Skills;
 import skills.SkillsRegistry;
 
@@ -33,6 +34,13 @@ public class RunState {
     /** Extra hull cost allowed for each stage cleared. */
     public static final int BUDGET_GAIN_PER_STAGE = 4;
 
+    /**
+     * Gold for clearing a stage: {@code CURRENCY_BASE + CURRENCY_PER_STAGE * stage}. That is
+     * 40, 50 and 60 for the first three, so the first shop (before stage 4) opens with 150.
+     */
+    public static final int CURRENCY_BASE = 30;
+    public static final int CURRENCY_PER_STAGE = 10;
+
     private static RunState instance = new RunState();
 
     private int stage = 1;
@@ -40,6 +48,12 @@ public class RunState {
     private int baseShots = STARTING_SHOTS;
     private int stagesCleared = 0;
     private List<Skills> loadout = new ArrayList<>();
+
+    /** Gold on hand, spent in the shop. */
+    private int currency = 0;
+
+    /** Fleet cost bought in the shop ("Expand your fleet"), on top of the stage's budget. */
+    private int budgetBonus = 0;
 
     /** The run currently in progress. */
     public static RunState current() {
@@ -126,9 +140,15 @@ public class RunState {
         this.loadout = loadout == null ? new ArrayList<>() : new ArrayList<>(loadout);
     }
 
-    /** Adds a skill to the loadout and pushes the whole thing back to the registry. */
+    /**
+     * Adds a skill to the loadout and pushes the whole thing back to the registry.
+     *
+     * <p>An upgrade takes the place of what it upgrades instead of sitting beside it, so
+     * taking ERA Silver while holding ERA Bronze leaves one ERA in the loadout, not two.
+     */
     public void addSkill(Skills skill) {
         if (skill == null) return;
+        loadout.removeAll(SkillPool.replacedBy(skill, loadout));
         loadout.add(skill);
         SkillsRegistry.setSelectedSkills(loadout);
     }
@@ -151,12 +171,61 @@ public class RunState {
      * player could only field one ship of at stage 1 comes out in full later.
      */
     public int getDeploymentBudget() {
-        return STARTING_DEPLOYMENT_BUDGET + (stage - 1) * BUDGET_GAIN_PER_STAGE;
+        return deploymentBudgetForStage(stage) + budgetBonus;
     }
 
-    /** The budget a given stage would allow, for previewing the curve. */
+    /**
+     * The budget a given stage allows before any fleet expansions.
+     *
+     * <p>This is also what the enemy is bought with. Expansions deliberately stay out of it:
+     * if buying fleet cost grew the enemy too, it would buy the player nothing.
+     */
     public static int deploymentBudgetForStage(int stage) {
         return STARTING_DEPLOYMENT_BUDGET + (Math.max(1, stage) - 1) * BUDGET_GAIN_PER_STAGE;
+    }
+
+    /** Fleet cost bought in the shop so far. */
+    public int getBudgetBonus() {
+        return budgetBonus;
+    }
+
+    public void setBudgetBonus(int budgetBonus) {
+        this.budgetBonus = Math.max(0, budgetBonus);
+    }
+
+    /** Permanently raises the deployment budget, as "Expand your fleet" does. */
+    public void addBudgetBonus(int delta) {
+        setBudgetBonus(this.budgetBonus + delta);
+    }
+
+    // ---- currency ------------------------------------------------------------------------
+
+    public int getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(int currency) {
+        this.currency = Math.max(0, currency);
+    }
+
+    public void addCurrency(int delta) {
+        setCurrency(this.currency + delta);
+    }
+
+    /**
+     * Pays {@code price} if the player has it.
+     *
+     * @return false, with nothing spent, when they cannot afford it
+     */
+    public boolean spendCurrency(int price) {
+        if (price < 0 || price > currency) return false;
+        currency -= price;
+        return true;
+    }
+
+    /** Gold paid out for clearing {@code stage}. */
+    public static int currencyForStage(int stage) {
+        return CURRENCY_BASE + CURRENCY_PER_STAGE * Math.max(1, stage);
     }
 
     // ---- difficulty ----------------------------------------------------------------------
@@ -178,6 +247,7 @@ public class RunState {
 
     @Override
     public String toString() {
-        return "Stage " + stage + "  |  Score " + score + "  |  Shots " + baseShots;
+        return "Stage " + stage + "  |  Score " + score + "  |  Shots " + baseShots
+                + "  |  Gold " + currency;
     }
 }

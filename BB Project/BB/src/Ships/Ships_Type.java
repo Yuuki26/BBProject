@@ -19,11 +19,12 @@ public interface Ships_Type {
     String getHullCode();
 
     /**
-     * Fixed build cost for the hull class.
+     * What this vessel costs to deploy.
      *
-     * <p>Set by the abstract class and final there, so no vessel, skill or reward can change
-     * it. Fleets are budgeted in cost rather than tile count, which is what keeps a board of
-     * six destroyers and a board of two battleships comparable.
+     * <p>Each named vessel sets its own, so ships of one class can be priced apart. It is
+     * fixed when the ship is built and final on {@link AbstractShip}, so no skill or reward
+     * can change it. Fleets are budgeted in cost rather than tile count, which is what keeps
+     * a board of six destroyers and a board of two battleships comparable.
      */
     int getCost();
 

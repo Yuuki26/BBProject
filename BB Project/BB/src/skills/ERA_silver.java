@@ -28,5 +28,16 @@ public class ERA_silver implements Defender_Skills{
     public int  turns () {
         return 3;
     }
+
+    @Override
+    public Rarity rarity() {
+        return Rarity.RARE;
+    }
+
+    /** Owning Bronze makes this likelier to be offered; taking it replaces Bronze. */
+    @Override
+    public Class<? extends Skills> upgradeOf() {
+        return ERA_BRONZE.class;
+    }
 }
 

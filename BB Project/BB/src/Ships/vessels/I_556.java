@@ -7,7 +7,8 @@ import Ships.ShipStats;
 public class I_556 extends Destroyer {
     public I_556() {
         super("I-556", new ShipStats()
-                .hp(4).shields(1).dmg(2).shots(3)
-                .penetration(2).detection(4).size(2));
+                .hp(350).shields(10).dmg(260).shots(3)
+                .penetration(25).detection(2).size(2).cost(2)
+                .image("/ships/vessels/I_556.png"));
     }
 }

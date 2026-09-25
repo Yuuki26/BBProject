@@ -7,7 +7,8 @@ import Ships.ShipStats;
 public class Montana extends Battleship {
     public Montana() {
         super("Montana", new ShipStats()
-                .hp(16).shields(10).dmg(9).shots(2)
-                .penetration(8).detection(7).size(4));
+                .hp(1600).shields(95).dmg(365).shots(2)
+                .penetration(120).detection(7).size(4).cost(12)
+                .image("/ships/vessels/Montana.png"));
     }
 }

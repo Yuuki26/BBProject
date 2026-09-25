@@ -68,7 +68,7 @@ public class MainMenuPanel extends JPanel {
             add(Box.createVerticalGlue());
 
             btnStart.addActionListener(e ->
-                    MainMenuPanel.this.cl.show(MainMenuPanel.this.cards, "Skills"));
+                    MainMenuPanel.this.cl.show(MainMenuPanel.this.cards, "STARTER_FLEET"));
             btnSettings.addActionListener(e ->
                     MainMenuPanel.this.cl.show(MainMenuPanel.this.cards, "PAUSE_MENU"));
             btnQuit.addActionListener(e -> System.exit(0));

@@ -10,7 +10,8 @@ import Ships.ShipStats;
 public class Enterprise extends AircraftCarrier {
     public Enterprise() {
         super("Enterprise", new ShipStats()
-                .hp(11).shields(2).dmg(6).shots(4)
-                .penetration(4).detection(6).size(4));
+                .hp(1800).shields(35).dmg(600).shots(2)
+                .penetration(55).detection(6).size(4).cost(15)
+                .image("/ships/vessels/Enterprise.png"));
     }
 }

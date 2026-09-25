@@ -30,5 +30,11 @@ public class ERA_BRONZE implements Defender_Skills {
     public int  turns () {
         return 3;
     }
+
+    /** The bottom of the ERA line: common, so a run can start one. */
+    @Override
+    public Rarity rarity() {
+        return Rarity.COMMON;
+    }
 }
 

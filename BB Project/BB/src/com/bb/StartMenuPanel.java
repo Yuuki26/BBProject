@@ -48,7 +48,7 @@ public class StartMenuPanel extends JPanel {
             if (frames != null) {
                 frames.startNewRun();
             } else {
-                cardLayout.show(cardPanel, "Skills");
+                cardLayout.show(cardPanel, "STARTER_FLEET");
             }
         });
 

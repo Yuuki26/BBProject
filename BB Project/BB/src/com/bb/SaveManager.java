@@ -26,8 +26,8 @@ import java.util.List;
  * to any of those classes.
  *
  * <p>A save captures the run (stage, score, salvo size, loadout) <em>and</em> the battle in
- * progress (both boards, both sets of hull points, every tile already fired at), so loading
- * puts the player back exactly where they stopped.
+ * progress (both boards, both sets of hull points, every tile already fired at, and whether
+ * Start had been pressed), so loading puts the player back exactly where they stopped.
  */
 public final class SaveManager {
 
@@ -87,6 +87,9 @@ public final class SaveManager {
         sb.append("score=").append(run.getScore()).append('\n');
         sb.append("stagesCleared=").append(run.getStagesCleared()).append('\n');
         sb.append("baseShots=").append(run.getBaseShots()).append('\n');
+        sb.append("battleStarted=").append(player.isBattleStarted()).append('\n');
+        sb.append("currency=").append(run.getCurrency()).append('\n');
+        sb.append("budgetBonus=").append(run.getBudgetBonus()).append('\n');
 
         List<String> skillNames = new ArrayList<>();
         for (Skills s : run.getLoadout()) {
@@ -95,20 +98,23 @@ public final class SaveManager {
         sb.append("skills=").append(String.join("|", skillNames)).append('\n');
 
         // Player fleet: type, originX, originY, horizontal, currentHP, maxHP, oxygen, surfaced.
-        // Undeployed ships are written with an origin of -1,-1 so the roster survives too.
+        // Undeployed ships are written with an origin of -1,-1 so the roster survives too, and
+        // with their hull if they have been damaged - a ship in port keeps its damage, so a
+        // save and load must not quietly repair it. 0,0 means "never damaged, full hull".
         // The last two fields only mean anything for submarines; other hulls write -1/false.
         for (Ship_Placement sp : player.getFleet().getPlacements()) {
             Point o = sp.getOrigin();
             boolean isSub = sp.getShip() instanceof Submarine;
             Submarine sub = isSub ? (Submarine) sp.getShip() : null;
+            boolean tracked = o != null || player.hasHullRecord(sp);
 
             sb.append("player=")
               .append(sp.getShip().getClass().getName()).append(',')
               .append(o == null ? -1 : o.x).append(',')
               .append(o == null ? -1 : o.y).append(',')
               .append(sp.isHorizontal()).append(',')
-              .append(o == null ? 0 : player.getShipHP(sp)).append(',')
-              .append(o == null ? 0 : player.getShipMaxHP(sp)).append(',')
+              .append(tracked ? player.currentHP(sp) : 0).append(',')
+              .append(tracked ? player.getShipMaxHP(sp) : 0).append(',')
               .append(isSub ? sub.getOxygen() : -1).append(',')
               .append(isSub && sub.isSurfaced())
               .append('\n');
@@ -195,6 +201,7 @@ public final class SaveManager {
         List<Integer> enemyHulls = new ArrayList<>();
         String playerIncoming = "";
         String enemyFired = "";
+        Boolean battleStarted = null;   // absent from saves written before the Start button
 
         try {
             for (String line : lines) {
@@ -208,6 +215,9 @@ public final class SaveManager {
                     case "score":         run.setScore(parseInt(value, 0)); break;
                     case "stagesCleared": run.setStagesCleared(parseInt(value, 0)); break;
                     case "baseShots":     run.setBaseShots(parseInt(value, RunState.STARTING_SHOTS)); break;
+                    case "battleStarted": battleStarted = Boolean.parseBoolean(value.trim()); break;
+                    case "currency":      run.setCurrency(parseInt(value, 0)); break;
+                    case "budgetBonus":   run.setBudgetBonus(parseInt(value, 0)); break;
                     case "skills":
                         for (String name : splitList(value)) {
                             Skills s = instantiateSkill(name);
@@ -270,8 +280,11 @@ public final class SaveManager {
         player.rebuildRosterFromFleet();
         for (int i = 0; i < playerShips.size(); i++) {
             Ship_Placement sp = playerShips.get(i);
-            if (sp.getOrigin() == null) continue;
             int[] hull = playerHulls.get(i);
+            if (sp.getOrigin() == null) {
+                player.restoreHull(sp, hull[0], hull[1]);   // no-op for a 0,0 "full hull" entry
+                continue;
+            }
             player.restoreShip(sp, hull[0], hull[1]);
         }
         for (String token : splitList(playerIncoming)) {
@@ -291,6 +304,13 @@ public final class SaveManager {
             if (r >= 0 && r < fired.length && c >= 0 && c < fired.length) fired[r][c] = true;
         }
         opponent.restoreStage(enemyShips, enemyHulls, fired);
+
+        // A save from before the Start button has no flag. Shots already fired mean that
+        // battle was under way; none means the player was still deploying.
+        boolean started = battleStarted != null
+                ? battleStarted
+                : !playerIncoming.isEmpty() || !enemyFired.isEmpty();
+        player.restoreBattleStarted(started);
 
         return null;
     }

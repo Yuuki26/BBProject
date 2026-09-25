@@ -39,6 +39,10 @@ import java.util.Set;
  * every ship is at least two tiles long, so a checkerboard cannot be crossed without being
  * hit, and that halves the work.
  *
+ * <p><b>Re-fire</b> - hits on a crippled or fully-hit ship can be fired on again at half
+ * damage, as the player can. While hunting it takes those after any tile that extends a line
+ * of hits, and before guessing anywhere else.
+ *
  * <h2>What it is not allowed to know</h2>
  * A board's {@link StealthMap} is built from the ships on it, so a full copy of it <em>is</em>
  * the fleet layout. This opponent therefore never reads a tile it has not fired at: detection
@@ -110,13 +114,43 @@ public class EliteEnemy implements EnemyAI {
 
     @Override
     public List<Point> generateShots(int maxShots) {
+        return generateShots(maxShots, null);
+    }
+
+    /**
+     * Picks a salvo, taking re-fires when they are worth it.
+     *
+     * <p>While hunting, a tile that extends a known line of hits comes first - it is the
+     * likeliest full-damage hit. Next come the re-fire targets: a guaranteed half-damage hit
+     * on a ship that is crippled, or has nowhere left to be found, beats guessing around it.
+     * Only then the rest of the hunt, and a sweep when there is no live contact at all.
+     */
+    @Override
+    public List<Point> generateShots(int maxShots, List<Point> refireTargets) {
         List<Point> untried = untriedTiles();
-        if (untried.isEmpty()) return new ArrayList<>();
+        List<Point> refires = new ArrayList<>();
+        if (refireTargets != null) {
+            for (Point p : refireTargets) {
+                if (!refires.contains(p)) refires.add(new Point(p));
+            }
+        }
+        if (untried.isEmpty() && refires.isEmpty()) return new ArrayList<>();
 
         List<Point> seeds = unresolvedHits();
-        List<Point> ranked = seeds.isEmpty()
-                ? rankForSweep(untried)
-                : rankForHunt(untried, seeds);
+        List<Point> ranked = new ArrayList<>();
+        if (seeds.isEmpty()) {
+            ranked.addAll(rankForSweep(untried));
+            ranked.addAll(refires);
+        } else {
+            List<Point> hunt = rankForHunt(untried, seeds);
+            for (Point p : hunt) {
+                if (extendsKnownLine(p)) ranked.add(p);
+            }
+            ranked.addAll(refires);
+            for (Point p : hunt) {
+                if (!extendsKnownLine(p)) ranked.add(p);
+            }
+        }
 
         List<Point> chosen = new ArrayList<>();
         for (Point p : ranked) {

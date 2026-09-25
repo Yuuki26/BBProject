@@ -5,16 +5,8 @@ package Ships;
  */
 public abstract class HeavyCruiser extends AbstractShip {
 
-    /** Fixed build cost for every heavy cruiser. */
-    public static final int COST = 6;
-
     protected HeavyCruiser(String name, ShipStats stats) {
         super(name, stats);
-    }
-
-    @Override
-    public final int getCost() {
-        return COST;
     }
 
     @Override
@@ -27,8 +19,9 @@ public abstract class HeavyCruiser extends AbstractShip {
         return "CB";
     }
 
+    /** Hull artwork, shown for any vessel of this class that has no picture of its own yet. */
     @Override
-    public String getImage() {
+    protected String defaultImage() {
         return "/ships/battleCrusier.png";
     }
 }

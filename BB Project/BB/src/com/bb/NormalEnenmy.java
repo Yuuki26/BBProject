@@ -30,12 +30,23 @@ public class NormalEnenmy implements EnemyAI {
 
     @Override
     public List<Point> generateShots(int maxShots) {
+        return generateShots(maxShots, null);
+    }
+
+    /** Random, as ever - re-fire targets simply join the pool of tiles it picks from. */
+    @Override
+    public List<Point> generateShots(int maxShots, List<Point> refireTargets) {
         List<Point> available = new ArrayList<>();
         for (int r = 0; r < board; r++) {
             for (int c = 0; c < board; c++) {
                 if (!hasfired[r][c]) {
                     available.add(new Point(c, r));
                 }
+            }
+        }
+        if (refireTargets != null) {
+            for (Point p : refireTargets) {
+                if (!available.contains(p)) available.add(new Point(p));
             }
         }
         Collections.shuffle(available, random);

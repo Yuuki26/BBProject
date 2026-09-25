@@ -6,9 +6,11 @@ import java.awt.*;
 /**
  * The application window and the card stack every screen lives on.
  *
- * <p>It also owns the run loop. A won battle goes to {@link #triggerStageWon(int)}, which
- * shows the reward screen and then rolls the next stage; only a loss reaches
- * {@link #triggerGameOver(boolean)} and ends the run.
+ * <p>It also owns the run loop. A won battle goes to {@link #triggerStageWon(int)}, which pays
+ * out gold, shows the reward screen, opens the {@link ShopPanel shop} when one is due, and
+ * then rolls the next stage; only a loss reaches {@link #triggerGameOver(boolean)} and ends
+ * the run. A new run goes straight to the starter fleet, then the board; skills only come
+ * from rewards, so every run starts with none.
  */
 public class Frames extends JFrame {
 
@@ -42,7 +44,8 @@ public class Frames extends JFrame {
     private RewardPanel rewardScreen;
     private GameLayout player;
     private OpponentPanel opponent;
-    private Skill_Dialogs skillSelect;
+    private StarterFleetPanel starterFleet;
+    private ShopPanel shopScreen;
 
     public Frames() {
         super("Battleship");
@@ -59,7 +62,7 @@ public class Frames extends JFrame {
         wrapper.setOpaque(false);
         content.setOpaque(false);
         wrapper.add(content, BorderLayout.CENTER);
-        wrapper.add(new Navigator(cl, cards), BorderLayout.SOUTH);
+        wrapper.add(new Navigator(cl, cards, player), BorderLayout.SOUTH);
         return wrapper;
     }
 
@@ -72,16 +75,18 @@ public class Frames extends JFrame {
         opponent.setMainFrame(this);
         opponent.setPlayerBoard(player);
 
-        skillSelect = new Skill_Dialogs(cl, cards, player::setActiveSkills);
+        starterFleet = new StarterFleetPanel(player, this::onStarterFleetChosen);
         rewardScreen = new RewardPanel(this::onRewardPicked);
+        shopScreen = new ShopPanel(player, this::beginStage);
         endScreen = new EndScreenPanel(cl, cards, this);
 
         cards.add(startMenu, "START_MENU");
         cards.add(pauseMenu, "PAUSE_MENU");
-        cards.add(skillSelect, "Skills");
+        cards.add(starterFleet, "STARTER_FLEET");
         cards.add(wrapper(player), "PLAYER");
         cards.add(wrapper(opponent), "OPPONENT");
         cards.add(rewardScreen, "REWARD");
+        cards.add(shopScreen, "SHOP");
         cards.add(endScreen, "END_SCREEN");
 
         add(cards, BorderLayout.CENTER);
@@ -102,27 +107,54 @@ public class Frames extends JFrame {
      */
     public void triggerStageWon(int hullRemaining) {
         RunState run = RunState.current();
+        int cleared = run.getStage();
         run.advanceStage(run.stageScore(hullRemaining));
-        rewardScreen.present(player);
+
+        int gold = RunState.currencyForStage(cleared);
+        run.addCurrency(gold);
+
+        rewardScreen.present(player, gold);
         cl.show(cards, "REWARD");
     }
 
-    /** Applies the chosen reward and starts the next stage. */
+    /**
+     * Applies the chosen reward, then either opens the shop or starts the next stage.
+     *
+     * <p>The board is settled for the next stage before the shop opens - shot marks cleared,
+     * fleet unlocked, sunk ships afloat again at 1 hull - so the shop repairs and sells from
+     * the state the player will actually sail with.
+     */
     private void onRewardPicked(Reward reward) {
         reward.apply(player);
 
-        // A new hull is added to the fleet undeployed, so the roster has to be rebuilt or it
-        // would never appear - leaving deployment permanently incomplete and blocking Fire.
-        if (reward.getKind() == Reward.Kind.SHIP) {
-            player.rebuildRosterFromFleet();
+        // Damage carries forward unless the player took the repair (applied just above).
+        player.prepareNextStage(false);
+
+        if (Shop.opensBefore(RunState.current().getStage())) {
+            shopScreen.open();
+            cl.show(cards, "SHOP");
+        } else {
+            beginStage();
         }
+    }
 
-        // Damage carries forward unless the player specifically took the repair.
-        player.prepareNextStage(reward.getKind() == Reward.Kind.REPAIR);
+    /** Rolls the enemy for the stage the run is now on and hands the player the board. */
+    private void beginStage() {
         opponent.startStage();
-
         player.setStatusText("Stage " + RunState.current().getStage()
-                + " - deploy any new ships, then fire. Press R to rotate.");
+                + " - fleet cost is now " + RunState.current().getDeploymentBudget()
+                + ". Deploy any new ships, then press Start.");
+        cl.show(cards, "PLAYER");
+    }
+
+    /** The starter fleet is on the roster: on to deploying it. */
+    private void onStarterFleetChosen() {
+        int total = player.getFleet().totalCost();
+        int budget = RunState.current().getDeploymentBudget();
+        player.setStatusText("Drag your ships onto the board (R rotates while dragging), "
+                + "then press Start." + (total > budget
+                        ? " Your fleet cost is " + budget + ", so not every ship fits - "
+                                + "the rest wait in port." : ""));
         cl.show(cards, "PLAYER");
     }
 
@@ -132,13 +164,16 @@ public class Frames extends JFrame {
         cl.show(cards, "END_SCREEN");
     }
 
-    /** Clears the run and returns to skill selection for a fresh start. */
+    /**
+     * Clears the run and deals a new starter fleet. The run begins with no skills; they are
+     * earned on the reward screens.
+     */
     public void startNewRun() {
         RunState.startNewRun();
         player.resetBoard();
         opponent.startStage();
-        skillSelect.clearSelection();
-        cl.show(cards, "Skills");
+        starterFleet.reset();
+        cl.show(cards, "STARTER_FLEET");
     }
 
     // =====================================================================================
@@ -204,5 +239,13 @@ public class Frames extends JFrame {
 
     public OpponentPanel getOpponentPanel() {
         return opponent;
+    }
+
+    public ShopPanel getShopPanel() {
+        return shopScreen;
+    }
+
+    public StarterFleetPanel getStarterFleetPanel() {
+        return starterFleet;
     }
 }

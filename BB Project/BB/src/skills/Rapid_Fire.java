@@ -41,4 +41,9 @@ public class Rapid_Fire implements Attacker_Skills {
     public int turns() {
         return 3;
     }
+
+    @Override
+    public Rarity rarity() {
+        return Rarity.UNCOMMON;
+    }
 }

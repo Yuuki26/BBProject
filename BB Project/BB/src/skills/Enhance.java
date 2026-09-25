@@ -36,4 +36,10 @@ public class Enhance implements Attacker_Skills {
     public int modify_level() {
         return 1;
     }
+
+    /** Strictly better than Heavy Caliber, so rarer than it. */
+    @Override
+    public Rarity rarity() {
+        return Rarity.RARE;
+    }
 }

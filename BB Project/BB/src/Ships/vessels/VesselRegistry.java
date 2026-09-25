@@ -63,18 +63,21 @@ public final class VesselRegistry {
         // Battleships
         ALL.add(new Entry(Nagato::new));
         ALL.add(new Entry(Montana::new));
+        ALL.add(new Entry(Monarch::new));
         // Heavy cruisers
         ALL.add(new Entry(Baltimore::new));
         ALL.add(new Entry(DesMoines::new));
         // Light cruisers
         ALL.add(new Entry(Helena::new));
         ALL.add(new Entry(Cleveland::new));
+        ALL.add(new Entry(Drake::new));
         // Destroyers
         ALL.add(new Entry(I_556::new));
         ALL.add(new Entry(I_141::new));
         // Submarines
         ALL.add(new Entry(Balao::new));
         ALL.add(new Entry(Archerfish::new));
+
     }
 
     private VesselRegistry() {}

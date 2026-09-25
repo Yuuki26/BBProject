@@ -7,7 +7,8 @@ import Ships.ShipStats;
 public class Essex extends AircraftCarrier {
     public Essex() {
         super("Essex", new ShipStats()
-                .hp(9).shields(2).dmg(7).shots(3)
-                .penetration(4).detection(6).size(4));
+                .hp(1600).shields(20).dmg(350).shots(3)
+                .penetration(50).detection(6).size(4).cost(14)
+                .image("/ships/vessels/Essex.png"));
     }
 }

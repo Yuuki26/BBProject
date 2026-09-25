@@ -6,16 +6,8 @@ package Ships;
  */
 public abstract class AircraftCarrier extends AbstractShip {
 
-    /** Fixed build cost for every carrier. */
-    public static final int COST = 8;
-
     protected AircraftCarrier(String name, ShipStats stats) {
         super(name, stats);
-    }
-
-    @Override
-    public final int getCost() {
-        return COST;
     }
 
     @Override
@@ -28,8 +20,9 @@ public abstract class AircraftCarrier extends AbstractShip {
         return "CV";
     }
 
+    /** Hull artwork, shown for any vessel of this class that has no picture of its own yet. */
     @Override
-    public String getImage() {
+    protected String defaultImage() {
         return "/ships/motherShip.png";
     }
 }

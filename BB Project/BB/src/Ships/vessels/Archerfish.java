@@ -10,8 +10,9 @@ import Ships.Submarine;
 public class Archerfish extends Submarine {
     public Archerfish() {
         super("Archerfish", new ShipStats()
-                .hp(4).shields(1).dmg(7).shots(1)
-                .penetration(8).detection(1).size(2),
+                .hp(450).shields(1).dmg(700).shots(1)
+                .penetration(89).detection(1).size(2).cost(5)
+                .image("/ships/vessels/Archerfish.png"),
                 5);
     }
 }

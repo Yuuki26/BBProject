@@ -23,6 +23,17 @@ public interface EnemyAI {
     List<Point> generateShots(int maxShots);
 
     /**
+     * Chooses up to {@code maxShots} distinct tiles: fresh ones, or tiles in
+     * {@code refireTargets} - hits on a crippled or fully-hit ship, which the board lets the
+     * opponent fire on again at half damage, the same rule the player plays by.
+     *
+     * <p>Defaults to ignoring the re-fires, for an opponent that never takes them.
+     */
+    default List<Point> generateShots(int maxShots, List<Point> refireTargets) {
+        return generateShots(maxShots);
+    }
+
+    /**
      * Reports what the last salvo found.
      *
      * <p>Defaulted to a no-op so a memoryless opponent does not have to care.

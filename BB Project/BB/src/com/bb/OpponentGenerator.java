@@ -1,6 +1,6 @@
 package com.bb;
 
-import Ships.DefaultFleet;
+import Ships.PlayerFleet;
 import Ships.Ship_Placement;
 import Ships.Ships_Type;
 import Ships.vessels.VesselRegistry;
@@ -13,14 +13,14 @@ import java.util.Random;
 /**
  * Builds the enemy fleet for a stage.
  *
- * <p>Fleets are budgeted in <b>cost</b>, not tile count. Cost is the fixed per-hull-class
+ * <p>Fleets are budgeted in <b>cost</b>, not tile count. Cost is the fixed per-vessel
  * number on {@link Ships_Type#getCost()}, so a budget of 20 buys one battleship and a
  * destroyer, or five light cruisers, and both are a fair match for the same player fleet.
  * Sizing by tiles would have made a board of cheap destroyers look identical to a board of
  * capital ships.
  *
- * <p>The budget is the player's own fleet cost scaled by the stage, and heavier hull classes
- * unlock as the run goes on.
+ * <p>The budget is the stage's base deployment budget - without any fleet expansions the
+ * player has bought - and heavier hull classes unlock as the run goes on.
  */
 public class OpponentGenerator {
 
@@ -40,7 +40,7 @@ public class OpponentGenerator {
     }
 
     /** Builds the fleet for the stage the run is currently on. */
-    public List<Ship_Placement> buildOpponentFleet(DefaultFleet playerFleet) {
+    public List<Ship_Placement> buildOpponentFleet(PlayerFleet playerFleet) {
         return buildOpponentFleet(playerFleet, RunState.current().getStage());
     }
 
@@ -54,7 +54,7 @@ public class OpponentGenerator {
      * @param playerFleet the player's roster; unused for sizing, kept for future tuning
      * @param stage       1-based stage number; higher means a bigger budget and heavier hulls
      */
-    public List<Ship_Placement> buildOpponentFleet(DefaultFleet playerFleet, int stage) {
+    public List<Ship_Placement> buildOpponentFleet(PlayerFleet playerFleet, int stage) {
         int budget = Math.max(VesselRegistry.cheapestCost(),
                 RunState.deploymentBudgetForStage(stage));
 

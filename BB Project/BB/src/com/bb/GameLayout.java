@@ -1,6 +1,6 @@
 package com.bb;
 
-import Ships.DefaultFleet;
+import Ships.PlayerFleet;
 import Ships.FleetCalculation;
 import Ships.Fleet_Layout;
 import Ships.Ship_Placement;
@@ -14,6 +14,7 @@ import skills.SkillsRegistry;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.awt.event.HierarchyEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -34,28 +35,68 @@ import java.util.Random;
  * Press a ship in the {@link Fleet_Layout} roster or on the board, move it, press
  * <kbd>R</kbd> to turn it, and release to place. See {@link #beginCarry} for why this is a
  * hand-rolled carry rather than Swing drag-and-drop.
+ *
+ * <h2>Starting the battle</h2>
+ * Deployment ends when the player presses Start ({@link #startBattle()}), which checks the
+ * fleet against the stage's cost budget and then locks it in until the stage is over.
+ *
+ * <h2>How ships are drawn</h2>
+ * A ship's tiles are see-through and its own picture is drawn across them
+ * ({@link #paintShips}). Hits are not painted onto tiles; a ship's condition is on its
+ * tooltip and stats board, and only two states show on the picture itself: a sunk ship is a
+ * grey wreck, and a submerged submarine is drawn faint. Open water is white, and dark grey
+ * where the enemy has fired and missed.
+ *
+ * <h2>Ship stats</h2>
+ * Hovering a ship shows a tooltip with its basics and a hull bar. Clicking one during a
+ * battle - or right-clicking one at any time, on the board or in port - opens a
+ * {@link ShipStatsCard} with everything about it; see {@link #showStats}.
  */
 public class GameLayout extends JPanel {
 
     public static final int SIZE = 8;
 
+    /**
+     * Property fired when the battle starts, and again when a new stage reopens deployment.
+     * {@link Navigator} listens for it to swap the Start button for Enemy Board.
+     */
+    public static final String PROP_BATTLE_STARTED = "battleStarted";
+
+    private static final String LOCKED_MESSAGE =
+            "The battle has started - your fleet is locked in until this stage ends.";
+
     // ---- cell colours -------------------------------------------------------------------
     private static final Color C_EMPTY     = Color.WHITE;
-    private static final Color C_SHIP      = new Color(70, 110, 170);
-    private static final Color C_SELECTED  = new Color(120, 170, 235);
     private static final Color C_GHOST_OK  = new Color(150, 220, 150);
     private static final Color C_GHOST_BAD = new Color(235, 150, 150);
     private static final Color C_MISS      = Color.DARK_GRAY;
-    private static final Color C_HIT       = new Color(200, 60, 50);
-    private static final Color C_SUNK      = new Color(110, 25, 20);
+    private static final Color C_OUTLINE   = new Color(255, 215, 90);
 
-    private final DefaultFleet fleet = new DefaultFleet();
+    private static final javax.swing.border.Border WATER_BORDER =
+            BorderFactory.createLineBorder(new Color(180, 180, 180));
+    /** Same insets as the water border, drawing nothing. */
+    private static final javax.swing.border.Border SHIP_BORDER =
+            BorderFactory.createEmptyBorder(1, 1, 1, 1);
+
+    /** How faint a submerged submarine is drawn: it is under water. */
+    private static final float SUBMERGED_ALPHA = 0.45f;
+    /** How faint the ship in hand is previewed where it would land. */
+    private static final float CARRY_ALPHA = 0.6f;
+    /** A sunk ship: grey, half see-through, and listing a few degrees. */
+    private static final float WRECK_ALPHA = 0.6f;
+    private static final double WRECK_LIST = Math.toRadians(5);
+
+    private final PlayerFleet fleet = new PlayerFleet();
 
     private final JButton[][] cells = new JButton[SIZE][SIZE];
     /** Ship occupying each tile, or {@code null} when the tile is open water. */
     private final Ship_Placement[][] board = new Ship_Placement[SIZE][SIZE];
 
-    /** Remaining hull points per deployed ship. Insertion-ordered so saves stay stable. */
+    /**
+     * Remaining hull points per ship that has been deployed. Kept when a ship goes back to
+     * port, so damage sticks until it is repaired or the ship is sold. Insertion-ordered so
+     * saves stay stable.
+     */
     private final Map<Ship_Placement, Integer> shipHP = new LinkedHashMap<>();
     /** Hull points each ship started the battle with, after defensive skills. */
     private final Map<Ship_Placement, Integer> shipMaxHP = new LinkedHashMap<>();
@@ -71,12 +112,27 @@ public class GameLayout extends JPanel {
      */
     private StealthMap stealthMap = new StealthMap(SIZE);
 
+    /** The stats board, and the ship it is showing (null while it is closed). */
+    private final ShipStatsCard statsCard = new ShipStatsCard(this::hideStats);
+    private Ship_Placement statsShip;
+
     /** Tiles currently showing a drag preview, so they can be restored on clear. */
     private final List<Point> ghostTiles = new ArrayList<>();
 
     private final Fleet_Layout roster;
     private final Frames mainFrame;
-    private final JLabel status = new JLabel("Drag your ships onto the board. Press R to rotate.");
+    private final JLabel status = new JLabel(
+            "Drag your ships onto the board (R rotates while dragging), then press Start.");
+
+    /**
+     * True once Start has been pressed for this stage. From then until the stage ends the
+     * fleet is locked in: nothing can be picked up, moved or auto-deployed.
+     */
+    private boolean battleStarted;
+
+    /** Deployment-only controls, disabled while the battle is on. */
+    private JButton rotateBtn;
+    private JButton autoBtn;
 
     /** The ship <kbd>R</kbd> will turn. Set by clicking a ship in the roster or on the board. */
     private Ship_Placement selected;
@@ -124,6 +180,14 @@ public class GameLayout extends JPanel {
         applyStealthTooltips();
         refreshBoard();
 
+        // The stats board floats over the window, so it has to be put away by hand when this
+        // board stops showing - on a switch to the enemy board, a menu, the shop.
+        addHierarchyListener(e -> {
+            if ((e.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0 && !isShowing()) {
+                hideStats();
+            }
+        });
+
         setBorder(BorderFactory.createTitledBorder(
                 BorderFactory.createLineBorder(Color.WHITE), "Your Fleet",
                 javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION,
@@ -135,20 +199,39 @@ public class GameLayout extends JPanel {
     // =====================================================================================
 
     private JComponent buildBoardPanel() {
-        JPanel grid = new JPanel(new GridLayout(SIZE, SIZE, 2, 2));
+        JPanel grid = new JPanel(new GridLayout(SIZE, SIZE, 2, 2)) {
+            @Override
+            protected void paintChildren(Graphics g) {
+                super.paintChildren(g);
+                paintShips(g);   // over the cells, so one picture can span several tiles
+            }
+        };
         grid.setOpaque(false);
         this.gridPanel = grid;
 
         MouseAdapter carryMouse = new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
-                if (!SwingUtilities.isLeftMouseButton(e)) return;
                 Point tile = tileAt(e.getComponent(), e.getPoint());
                 if (tile == null) return;
-
                 Ship_Placement sp = board[tile.y][tile.x];
+
+                // Right-click opens the stats board at any time; so does a plain click once
+                // the fleet is locked in, when there is nothing left to pick up.
+                if (SwingUtilities.isRightMouseButton(e)) {
+                    toggleStats(sp, e.getComponent());
+                    return;
+                }
+                if (!SwingUtilities.isLeftMouseButton(e)) return;
+
                 if (sp == null) {
+                    hideStats();
                     setSelected(null);
+                    return;
+                }
+                if (battleStarted) {
+                    setSelected(sp);   // so Surface / Dive acts on the ship being looked at
+                    toggleStats(sp, e.getComponent());
                     return;
                 }
                 beginCarry(sp, e.getComponent(), e.getPoint());
@@ -182,8 +265,11 @@ public class GameLayout extends JPanel {
                 JButton cell = new JButton();
                 cell.setFocusable(false);
                 cell.setOpaque(true);
+                // A flat fill from the background alone: no pressed-button grey flashing up
+                // under the cursor when a ship is picked up.
+                cell.setContentAreaFilled(false);
                 cell.setBackground(C_EMPTY);
-                cell.setBorder(BorderFactory.createLineBorder(new Color(180, 180, 180)));
+                cell.setBorder(WATER_BORDER);
                 cell.putClientProperty("coord", "" + (char) ('A' + c) + (r + 1));
 
                 cell.addMouseListener(carryMouse);
@@ -254,11 +340,11 @@ public class GameLayout extends JPanel {
         JPanel bar = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 6));
         bar.setOpaque(false);
 
-        JButton rotateBtn = new JButton("Rotate (R)");
+        rotateBtn = new JButton("Rotate (R)");
         rotateBtn.setFocusable(false);
         rotateBtn.addActionListener(e -> rotateSelected());
 
-        JButton autoBtn = new JButton("Auto-deploy");
+        autoBtn = new JButton("Auto-deploy");
         autoBtn.setFocusable(false);
         autoBtn.addActionListener(e -> autoDeploy());
 
@@ -295,6 +381,14 @@ public class GameLayout extends JPanel {
             }
         });
 
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "closeStats");
+        am.put("closeStats", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                hideStats();
+            }
+        });
+
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_F, 0), "toggleSurface");
         am.put("toggleSurface", new AbstractAction() {
             @Override
@@ -311,18 +405,21 @@ public class GameLayout extends JPanel {
     /** Called by {@link Fleet_Layout} when a roster ship is clicked. */
     public void setSelected(Ship_Placement sp) {
         this.selected = sp;
-        if (sp == null) {
-            Ship_Placement next = nextUndeployed();
-            status.setText(next == null
-                    ? "Fleet deployed."
-                    : "Hover a ship and press R to rotate, then drag it onto the board.");
-        } else if (!isDeployed(sp)) {
-            status.setText(describe(sp) + " - press R to rotate.");
-        } else {
-            status.setText(describe(sp) + " deployed.");
-        }
+        // Deployment hints would only mislead once the fleet is locked in.
+        if (!battleStarted) status.setText(selectionHint(sp));
         roster.setSelected(sp);
         refreshBoard();
+    }
+
+    private String selectionHint(Ship_Placement sp) {
+        if (sp == null) {
+            return nextUndeployed() == null
+                    ? "Fleet deployed - press Start."
+                    : "Drag a ship onto the board - press R while dragging to rotate it.";
+        }
+        return isDeployed(sp)
+                ? describe(sp) + " deployed."
+                : describe(sp) + " - drag it onto the board, R rotates it on the way.";
     }
 
     public Ship_Placement getSelected() {
@@ -339,7 +436,9 @@ public class GameLayout extends JPanel {
      */
     public void rotateSelected() {
         if (carried == null) {
-            status.setText("Pick a ship up first - rotation happens while you are moving it.");
+            status.setText(battleStarted
+                    ? LOCKED_MESSAGE
+                    : "Pick a ship up first - rotation happens while you are moving it.");
             Toolkit.getDefaultToolkit().beep();
             return;
         }
@@ -395,10 +494,21 @@ public class GameLayout extends JPanel {
         beginCarryAt(sp, tileAt(source, pointInSource));
     }
 
-    /** Picks {@code sp} up with its origin over {@code tile}, which may be null. */
+    /**
+     * Picks {@code sp} up with its origin over {@code tile}, which may be null.
+     *
+     * <p>Refused once the battle has started: a ship that could still be moved could dodge a
+     * hit it had already taken, or go back to port and come out again at full hull.
+     */
     public void beginCarryAt(Ship_Placement sp, Point tile) {
         if (sp == null || carried != null) return;
+        if (battleStarted) {
+            status.setText(LOCKED_MESSAGE);
+            Toolkit.getDefaultToolkit().beep();
+            return;
+        }
 
+        hideStats();
         carried = sp;
         carryHorizontal = sp.isHorizontal();
         carryReturnOrigin = isDeployed(sp) && sp.getOrigin() != null
@@ -491,11 +601,16 @@ public class GameLayout extends JPanel {
     }
 
     /** Sends a ship back to port: off the board, out of the cost, into the roster. */
+    /**
+     * Sends a ship back to port: off the board, out of the cost, into the roster.
+     *
+     * <p>Its damage goes with it. Forgetting the hull points here used to mean a battered ship
+     * could be dragged to port and straight back out at full strength - a free repair that
+     * would make the shop's paid one pointless.
+     */
     private void returnToRoster(Ship_Placement sp) {
         clearTiles(sp);
         sp.setOrigin(null);
-        shipHP.remove(sp);
-        shipMaxHP.remove(sp);
         roster.rebuild();
         refreshBoard();
         announceDeploymentProgress();
@@ -510,8 +625,13 @@ public class GameLayout extends JPanel {
         for (Point p : tilesFor(carried, carryOrigin, carryHorizontal)) {
             if (p.x < 0 || p.x >= SIZE || p.y < 0 || p.y >= SIZE) continue;
             ghostTiles.add(new Point(p.x, p.y));
-            cells[p.y][p.x].setBackground(ok ? C_GHOST_OK : C_GHOST_BAD);
+            // Filled even over another ship's see-through tiles, so an overlap shows red.
+            JButton cell = cells[p.y][p.x];
+            cell.setOpaque(true);
+            cell.setBorder(WATER_BORDER);
+            cell.setBackground(ok ? C_GHOST_OK : C_GHOST_BAD);
         }
+        if (gridPanel != null) gridPanel.repaint();   // moves the ship's picture along
     }
 
     /**
@@ -636,11 +756,107 @@ public class GameLayout extends JPanel {
         if (sp == null) return;
         clearTiles(sp);
         sp.setOrigin(null);
+        if (selected == sp) selected = null;
+        roster.rebuild();
+        refreshBoard();
+        announceDeploymentProgress();
+    }
+
+    // =====================================================================================
+    // Roster changes: starter pick, shop
+    // =====================================================================================
+
+    /**
+     * Installs the starter fleet as the roster, undeployed.
+     *
+     * <p>Each ship has to fit the fleet cost on its own, so every one of them can be put on
+     * the board. Together they may cost more than that; deploying is then a matter of
+     * choosing which to leave in port.
+     *
+     * @return null when installed, or why it was refused: no ships, or a ship that costs
+     *         more than the whole fleet cost and so could never be deployed
+     */
+    public String setStarterFleet(List<Ships_Type> picks) {
+        if (picks == null || picks.isEmpty()) return "Choose at least one ship.";
+
+        int budget = RunState.current().getDeploymentBudget();
+        for (Ships_Type t : picks) {
+            if (t.getCost() > budget) {
+                return t.getName() + " costs " + t.getCost() + ", more than your fleet cost of "
+                        + budget + " - it could never be deployed.";
+            }
+        }
+
+        resetBoard();
+        for (Ships_Type t : picks) fleet.addShip(t);
+        roster.rebuild();
+        refreshBoard();
+        announceDeploymentProgress();
+        return null;
+    }
+
+    /** Adds a newly bought ship to the roster, undeployed and at full hull. */
+    public Ship_Placement addToRoster(Ships_Type type) {
+        Ship_Placement sp = fleet.addShip(type);
+        roster.rebuild();
+        announceDeploymentProgress();
+        return sp;
+    }
+
+    /** Takes a ship out of the fleet for good, lifting it off the board first if need be. */
+    public void sellShip(Ship_Placement sp) {
+        if (sp == null) return;
+        if (carried == sp) cancelCarry();
+        clearTiles(sp);
+        sp.setOrigin(null);
+        fleet.removeShip(sp);
         shipHP.remove(sp);
         shipMaxHP.remove(sp);
         if (selected == sp) selected = null;
+        if (hovered == sp) hovered = null;
+        roster.rebuild();
         refreshBoard();
         announceDeploymentProgress();
+    }
+
+    /**
+     * Hull points right now, whether the ship is deployed or in port. A ship that has never
+     * been damaged has no record and is at full hull.
+     */
+    public int currentHP(Ship_Placement sp) {
+        return shipHP.containsKey(sp) ? shipHP.get(sp) : getShipMaxHP(sp);
+    }
+
+    /** True when the ship has lost hull points that a repair would restore. */
+    public boolean isDamaged(Ship_Placement sp) {
+        return currentHP(sp) < getShipMaxHP(sp);
+    }
+
+    /** True when this board is keeping hull points for the ship. Used by saves. */
+    public boolean hasHullRecord(Ship_Placement sp) {
+        return shipHP.containsKey(sp);
+    }
+
+    /** Restores a ship to full hull. */
+    public void repairShip(Ship_Placement sp) {
+        if (sp == null || !shipHP.containsKey(sp)) return;
+        shipHP.put(sp, getShipMaxHP(sp));
+        refreshBoard();
+    }
+
+    /** Restores every ship the player owns to full hull, on the board or in port. */
+    public void repairAll() {
+        for (Ship_Placement sp : fleet.getPlacements()) {
+            if (shipHP.containsKey(sp)) shipHP.put(sp, getShipMaxHP(sp));
+        }
+        refreshBoard();
+    }
+
+    /** Puts a ship's hull points back from a save, without deploying it. */
+    public void restoreHull(Ship_Placement sp, int currentHP, int maxHP) {
+        if (sp == null || maxHP <= 0) return;
+        shipMaxHP.put(sp, maxHP);
+        shipHP.put(sp, Math.max(0, Math.min(currentHP, maxHP)));
     }
 
     public void clearGhost() {
@@ -648,6 +864,7 @@ public class GameLayout extends JPanel {
             paintCell(p.y, p.x);
         }
         ghostTiles.clear();
+        if (gridPanel != null) gridPanel.repaint();
     }
 
     private void clearTiles(Ship_Placement sp) {
@@ -672,9 +889,11 @@ public class GameLayout extends JPanel {
 
         StringBuilder text = new StringBuilder("Cost " + spent + " / " + budget);
         if (deployedCount() == 0) {
-            text.append(" - deploy at least one ship before you can fire.");
-        } else if (left <= 0) {
-            text.append(" - budget spent. Fire, or drag a ship back to swap it.");
+            text.append(" - deploy at least one ship before you can start.");
+        } else if (spent > budget) {
+            text.append(" - over budget. Drag a ship back to port before you can start.");
+        } else if (left == 0) {
+            text.append(" - budget spent. Press Start, or drag a ship back to swap it.");
         } else {
             text.append(" - ").append(left).append(" left");
             Ship_Placement next = cheapestUndeployed();
@@ -701,6 +920,10 @@ public class GameLayout extends JPanel {
 
     /** Randomly places every ship still sitting in the roster. */
     public void autoDeploy() {
+        if (battleStarted) {
+            status.setText(LOCKED_MESSAGE);
+            return;
+        }
         Random rnd = new Random();
 
         // Spend the budget on the heaviest hulls that still fit, rather than whatever comes
@@ -737,7 +960,7 @@ public class GameLayout extends JPanel {
     // Battle state
     // =====================================================================================
 
-    public DefaultFleet getFleet() {
+    public PlayerFleet getFleet() {
         return fleet;
     }
 
@@ -786,9 +1009,79 @@ public class GameLayout extends JPanel {
      * unfinished setup. One deployed ship is enough to start.
      */
     public boolean isReadyForBattle() {
-        // Also refuses an over-budget board: a guard here means no future placement path can
-        // quietly let a fleet sail that the stage was never allowed to field.
-        return deployedCount() > 0 && getDeployedCost() <= RunState.current().getDeploymentBudget();
+        return deploymentProblem() == null;
+    }
+
+    /**
+     * Why the fleet cannot sail yet, or null when it can.
+     *
+     * <p>Also refuses an over-budget board. Placement already refuses anything the budget
+     * cannot pay for, so this only trips on a fleet that reached the board some other way -
+     * a save written before the budget existed, say - but checking here means no path,
+     * present or future, can quietly let a fleet sail that the stage never allowed.
+     */
+    private String deploymentProblem() {
+        if (deployedCount() == 0) {
+            return "deploy at least one ship first.";
+        }
+        int spent = getDeployedCost();
+        int budget = RunState.current().getDeploymentBudget();
+        if (spent > budget) {
+            return "your fleet costs " + spent + " but this stage's budget is " + budget
+                    + " - drag a ship back to port.";
+        }
+        return null;
+    }
+
+    // =====================================================================================
+    // Starting the battle
+    // =====================================================================================
+
+    /** True once Start has been pressed this stage, and the fleet is locked in. */
+    public boolean isBattleStarted() {
+        return battleStarted;
+    }
+
+    /**
+     * The Start button: checks the deployment, locks the fleet in, and begins the battle.
+     *
+     * <p>Refuses, and says why on the status bar, when nothing is deployed or the fleet on
+     * the board costs more than this stage's budget.
+     *
+     * @return true when the battle is now under way
+     */
+    public boolean startBattle() {
+        if (battleStarted) return true;
+        cancelCarry();
+
+        String problem = deploymentProblem();
+        if (problem != null) {
+            status.setText("Can't start: " + problem);
+            return false;
+        }
+
+        setBattleStarted(true);
+        setSelected(null);   // a deployment pick; in battle the outline follows clicks
+        status.setText("Battle started with " + deployedCount() + " ship"
+                + (deployedCount() == 1 ? "" : "s") + " (cost " + getDeployedCost() + " / "
+                + RunState.current().getDeploymentBudget() + "). Your fleet is locked in.");
+        return true;
+    }
+
+    /** Puts a loaded game back in the phase it was saved in, without re-checking it. */
+    public void restoreBattleStarted(boolean started) {
+        setBattleStarted(started);
+    }
+
+    private void setBattleStarted(boolean started) {
+        boolean was = battleStarted;
+        battleStarted = started;
+
+        if (rotateBtn != null) rotateBtn.setEnabled(!started);
+        if (autoBtn != null) autoBtn.setEnabled(!started);
+        roster.rebuild();
+
+        firePropertyChange(PROP_BATTLE_STARTED, was, started);
     }
 
     /** True when nothing left in the roster can be paid for out of this stage's budget. */
@@ -847,7 +1140,7 @@ public class GameLayout extends JPanel {
         return Math.max(1, total);
     }
 
-    /** Hands the chosen loadout to the registry. Wired in from {@code Skill_Dialogs}. */
+    /** Hands a skill loadout to the registry and the run, and rescales deployed hulls. */
     public void setActiveSkills(List<Skills> selected) {
         SkillsRegistry.setSelectedSkills(selected);
         RunState.current().setLoadout(selected);
@@ -877,11 +1170,19 @@ public class GameLayout extends JPanel {
                 new ModifiedStats().shieldModifier()  // the player's defensive skills do apply
         );
         int perHit = Math.max(1, Math.round(damage));
+        int halfHit = Math.max(1, Math.round(damage / 2f));
 
         int hits = 0;
+        java.util.Set<Point> thisSalvo = new java.util.HashSet<>();
         for (Point p : shots) {
             if (p.x < 0 || p.x >= SIZE || p.y < 0 || p.y >= SIZE) continue;
-            if (incomingShot[p.y][p.x]) continue;
+            if (!thisSalvo.add(new Point(p))) continue;
+
+            // Same rule the player fires under: a tile already hit can be hit again, at half
+            // damage, once its ship is crippled or has had every tile hit. Anything else
+            // already fired on is a wasted shot.
+            boolean refire = incomingShot[p.y][p.x];
+            if (refire && !isRefireTarget(p.y, p.x)) continue;
 
             incomingShot[p.y][p.x] = true;
             Ship_Placement hit = board[p.y][p.x];
@@ -892,7 +1193,7 @@ public class GameLayout extends JPanel {
 
             incomingHit[p.y][p.x] = true;
             hits++;
-            int remaining = shipHP.getOrDefault(hit, getShipMaxHP(hit)) - perHit;
+            int remaining = shipHP.getOrDefault(hit, getShipMaxHP(hit)) - (refire ? halfHit : perHit);
             shipHP.put(hit, Math.max(0, remaining));
 
             // Concealment is the hull's own stealth plus the water it is sitting in. It only
@@ -915,13 +1216,41 @@ public class GameLayout extends JPanel {
         return outcomes;
     }
 
+    /**
+     * Tiles the enemy has already hit and may fire on again, at half damage: hits on a ship
+     * that is still afloat and is either at or below half hull, or has had every tile hit.
+     *
+     * <p>Handed to the opponent each turn. It only ever names tiles the opponent has already
+     * hit itself, so it gives away nothing the player could not see on the enemy's side.
+     */
+    public List<Point> refireTargets() {
+        List<Point> out = new ArrayList<>();
+        for (int r = 0; r < SIZE; r++) {
+            for (int c = 0; c < SIZE; c++) {
+                if (isRefireTarget(r, c)) out.add(new Point(c, r));
+            }
+        }
+        return out;
+    }
+
+    private boolean isRefireTarget(int row, int col) {
+        if (!incomingHit[row][col]) return false;
+        Ship_Placement sp = board[row][col];
+        if (sp == null) return false;
+        int hp = shipHP.getOrDefault(sp, getShipMaxHP(sp));
+        if (hp <= 0) return false;
+        if (hp <= getShipMaxHP(sp) * 0.5f) return true;
+        for (Point tile : sp.getOccupiedTiles()) {
+            if (!incomingHit[tile.y][tile.x]) return false;
+        }
+        return true;   // every tile hit, still above half: nowhere left to find it
+    }
+
     /** True once every deployed ship is out of hull points. */
     public boolean isDefeated() {
-        if (shipHP.isEmpty()) return false;
-        for (int hp : shipHP.values()) {
-            if (hp > 0) return false;
-        }
-        return true;
+        // Only what is on the board counts: ships in port keep their hull records now, and a
+        // healthy one sitting there must not keep a sunk fleet in the fight.
+        return deployedCount() > 0 && getAlivePlacements().isEmpty();
     }
 
     // =====================================================================================
@@ -943,56 +1272,121 @@ public class GameLayout extends JPanel {
                 paintCell(r, c);
             }
         }
+        if (statsShip != null) {
+            // Keep an open stats board in step - a repair, a dive, a ship sold from under it.
+            if (fleet.getPlacements().contains(statsShip)) statsCard.show(statsShip, this);
+            else hideStats();
+        }
         repaint();
     }
 
     private void paintCell(int r, int c) {
         JButton cell = cells[r][c];
-        Ship_Placement sp = board[r][c];
-
         cell.setText("");
-        cell.setForeground(Color.WHITE);
 
-        if (incomingShot[r][c]) {
-            if (incomingHit[r][c]) {
-                boolean sunk = sp != null && shipHP.getOrDefault(sp, 1) <= 0;
-                cell.setBackground(sunk ? C_SUNK : C_HIT);
-                cell.setText(sunk ? "X" : "*");
-            } else {
-                cell.setBackground(C_MISS);
-            }
+        if (board[r][c] != null) {
+            // See-through: the ship's picture is drawn across its tiles by paintShips. Hits
+            // are not painted on - a ship's condition is on its tooltip and stats board.
+            cell.setOpaque(false);
+            cell.setBorder(SHIP_BORDER);
             return;
         }
 
-        if (sp == null) {
-            cell.setBackground(C_EMPTY);
-            cell.setBorder(BorderFactory.createLineBorder(new Color(180, 180, 180)));
-            return;
-        }
-
-        // Ship tiles are shaded by detection, so how visible each hull is can be read at a
-        // glance - a submarine going dark when it dives, and lighting up when it surfaces.
-        cell.setBackground(detectionColour(stealthMap.at(r, c)));
-        cell.setBorder(sp == selected
-                ? BorderFactory.createLineBorder(new Color(255, 215, 90), 2)
-                : BorderFactory.createLineBorder(new Color(180, 180, 180)));
+        // Open water: white, or dark grey where the enemy fired and missed.
+        cell.setOpaque(true);
+        cell.setBorder(WATER_BORDER);
+        cell.setBackground(incomingShot[r][c] ? C_MISS : C_EMPTY);
     }
 
     /**
-     * Colour ramp for a ship tile's detection.
+     * Draws each deployed ship's picture across its tiles, over the see-through cells.
      *
-     * <p>Dark navy is nearly invisible, pale grey-blue is obvious. Running low to high rather
-     * than the other way round means the loudest ships stand out on screen exactly as they do
-     * to the enemy search.
+     * <p>A sunk ship is drawn as a grey wreck, listing and half see-through, and a submerged
+     * submarine faintly, since it is under water. The listing is what tells a wreck apart
+     * whatever the art's own colours - a dark submarine, a grey carrier. The ship the stats
+     * board is showing, or the one last clicked, gets a gold outline, and the ship in hand is
+     * previewed faintly where it would land.
      */
-    private Color detectionColour(int detection) {
-        int d = Math.max(0, Math.min(StealthMap.MAX_DETECTION, detection));
-        float t = d / (float) StealthMap.MAX_DETECTION;
+    private void paintShips(Graphics g0) {
+        Graphics2D g = (Graphics2D) g0.create();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                RenderingHints.VALUE_INTERPOLATION_BILINEAR);
 
-        int red   = Math.round(24 + t * (198 - 24));
-        int green = Math.round(44 + t * (214 - 44));
-        int blue  = Math.round(86 + t * (232 - 86));
-        return new Color(red, green, blue);
+        for (Ship_Placement sp : getDeployedPlacements()) {
+            Rectangle area = footprint(sp.getOccupiedTiles());
+            boolean sunk = shipHP.getOrDefault(sp, 1) <= 0;
+            boolean submerged = sp.getShip() instanceof Submarine
+                    && !((Submarine) sp.getShip()).isSurfaced();
+            drawShip(g, sp.getShip().getImage(), area, sp.isHorizontal(), sunk,
+                    sunk ? WRECK_ALPHA : submerged ? SUBMERGED_ALPHA : 1f);
+
+            if (sp == selected || sp == statsShip) {
+                g.setColor(C_OUTLINE);
+                g.setStroke(new BasicStroke(2f));
+                g.drawRoundRect(area.x + 1, area.y + 1, area.width - 3, area.height - 3, 12, 12);
+            }
+        }
+
+        if (carried != null && carryOrigin != null) {
+            drawShip(g, carried.getShip().getImage(),
+                    footprint(tilesFor(carried, carryOrigin, carryHorizontal)),
+                    carryHorizontal, false, CARRY_ALPHA);
+        }
+        g.dispose();
+    }
+
+    /**
+     * Draws one ship's picture centred in {@code area}, turned upright for a vertical ship.
+     * The art is scaled for the screen's own pixel density, so it stays sharp on a scaled
+     * display.
+     */
+    private void drawShip(Graphics2D g, String image, Rectangle area, boolean horizontal,
+                          boolean wreck, float alpha) {
+        if (area == null) return;
+        int pad = 3;
+        int along = (horizontal ? area.width : area.height) - 2 * pad;
+        int across = (horizontal ? area.height : area.width) - 2 * pad;
+        if (along <= 0 || across <= 0) return;
+
+        double density = g.getTransform().getScaleX();
+        if (density <= 0) density = 1;
+        java.awt.image.BufferedImage art = Icons.art(image,
+                (int) (along * density), (int) (across * density), wreck);
+        if (art == null) return;
+
+        double w = art.getWidth() / density;
+        double h = art.getHeight() / density;
+        Graphics2D gg = (Graphics2D) g.create();
+        gg.translate(area.getCenterX(), area.getCenterY());
+        if (!horizontal) gg.rotate(Math.PI / 2);
+        if (wreck) {
+            gg.rotate(WRECK_LIST);
+            gg.scale(0.9, 0.9);   // so the list stays inside its own tiles
+        }
+        if (alpha < 1f) gg.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+        gg.drawImage(art, (int) Math.round(-w / 2), (int) Math.round(-h / 2),
+                (int) Math.round(w), (int) Math.round(h), null);
+        gg.dispose();
+    }
+
+    /**
+     * The grid area {@code tiles} cover, in the grid's coordinates. Worked out from the first
+     * cell's size and spacing, so tiles hanging off the board (a ship being dragged in) still
+     * get a place.
+     */
+    private Rectangle footprint(List<Point> tiles) {
+        if (tiles == null || tiles.isEmpty()) return null;
+        Rectangle first = cells[0][0].getBounds();
+        int stepX = cells[0][1].getX() - first.x;
+        int stepY = cells[1][0].getY() - first.y;
+        Rectangle area = null;
+        for (Point p : tiles) {
+            Rectangle r = new Rectangle(first.x + p.x * stepX, first.y + p.y * stepY,
+                    first.width, first.height);
+            area = area == null ? r : area.union(r);
+        }
+        return area;
     }
 
     // =====================================================================================
@@ -1008,33 +1402,153 @@ public class GameLayout extends JPanel {
         return stealthMap.at(row, col);
     }
 
-    /** Names each tile and, where a ship sits, its detection and any oxygen state. */
+    /** Names each tile and, where a ship sits, its basics and a hull bar. */
     private void applyStealthTooltips() {
         for (int r = 0; r < SIZE; r++) {
             for (int c = 0; c < SIZE; c++) {
                 String coord = "" + (char) ('A' + c) + (r + 1);
                 Ship_Placement sp = board[r][c];
-
-                if (sp == null) {
-                    cells[r][c].setToolTipText(coord + " - open water");
-                    continue;
-                }
-
-                Ships_Type ship = sp.getShip();
-                StringBuilder tip = new StringBuilder(coord + " - " + ship.getName()
-                        + " (" + ship.getHullCode() + ")"
-                        + ", detection " + ship.getDetection()
-                        + ", cost " + ship.getCost());
-
-                if (ship instanceof Submarine) {
-                    Submarine sub = (Submarine) ship;
-                    tip.append(sub.isSurfaced()
-                            ? " - SURFACED, oxygen " + sub.getOxygen() + "/" + sub.getMaxOxygen()
-                            : " - submerged, oxygen " + sub.getOxygen() + "/" + sub.getMaxOxygen());
-                }
-                cells[r][c].setToolTipText(tip.toString());
+                cells[r][c].setToolTipText(sp == null ? coord + " - open water"
+                        : shipTooltip(sp, coord, null));
             }
         }
+    }
+
+    /**
+     * The hover text for one of the player's ships: name, detection, size and cost, a small
+     * hull bar, and a submarine's oxygen. Shared by the board and the roster.
+     *
+     * @param where shown after the name, e.g. the tile; may be null
+     * @param note  an extra line at the end; may be null
+     */
+    public String shipTooltip(Ship_Placement sp, String where, String note) {
+        Ships_Type ship = sp.getShip();
+        int hp = currentHP(sp);
+        int max = getShipMaxHP(sp);
+
+        StringBuilder tip = new StringBuilder("<html><b>").append(ship.getName())
+                .append("</b> (").append(ship.getHullCode()).append(")");
+        if (where != null) tip.append(" &middot; ").append(where);
+        tip.append("<br>Detection ").append(ship.getDetection())
+                .append(" &middot; Size ").append(ship.getSize())
+                .append(" &middot; Cost ").append(ship.getCost());
+
+        // Two table cells make the bar: Swing's HTML draws their backgrounds reliably.
+        int barWidth = 120;
+        int filled = max <= 0 ? 0 : Math.round(barWidth * Math.max(0, Math.min(hp, max)) / (float) max);
+        tip.append("<table cellpadding=0 cellspacing=0 border=0><tr>");
+        if (filled > 0) {
+            tip.append("<td bgcolor=").append(hex(ShipStatsCard.hullColour(hp, max)))
+                    .append(" width=").append(filled).append(" height=7></td>");
+        }
+        if (filled < barWidth) {
+            tip.append("<td bgcolor=#50555f width=").append(barWidth - filled)
+                    .append(" height=7></td>");
+        }
+        tip.append("</tr></table>").append(hp <= 0 ? "Sunk" : hp + " / " + max + " HP");
+
+        if (ship instanceof Submarine) {
+            Submarine sub = (Submarine) ship;
+            tip.append("<br>").append(sub.isSurfaced() ? "Surfaced" : "Submerged")
+                    .append(", oxygen ").append(sub.getOxygen()).append("/").append(sub.getMaxOxygen());
+        }
+        if (note != null) tip.append("<br><i>").append(note).append("</i>");
+        tip.append("<br><font color=#5a6272>")
+                .append(battleStarted ? "Click" : "Right-click").append(" for full stats</font>");
+        return tip.append("</html>").toString();
+    }
+
+    private static String hex(Color c) {
+        return String.format("#%02x%02x%02x", c.getRed(), c.getGreen(), c.getBlue());
+    }
+
+    // =====================================================================================
+    // Ship stats board
+    // =====================================================================================
+
+    /**
+     * Opens the stats board for {@code sp}, next to it.
+     *
+     * <p>The board floats on the window's layered pane, beside the ship's tiles when it is
+     * deployed and beside {@code anchor} (the roster entry, say) when it is not, flipping
+     * to the other side when it would run off the window.
+     */
+    public void showStats(Ship_Placement sp, Component anchor) {
+        if (sp == null) {
+            hideStats();
+            return;
+        }
+        statsShip = sp;
+        statsCard.show(sp, this);
+
+        JRootPane root = getRootPane();
+        if (root != null) {
+            JLayeredPane layer = root.getLayeredPane();
+            if (statsCard.getParent() != layer) layer.add(statsCard, JLayeredPane.POPUP_LAYER);
+
+            Rectangle near = anchorBounds(sp, anchor, layer);
+            Dimension d = statsCard.getPreferredSize();
+            int x = near.x + near.width + 12;
+            if (x + d.width > layer.getWidth() - 8) x = near.x - d.width - 12;
+            x = Math.max(8, Math.min(x, layer.getWidth() - d.width - 8));
+            int y = Math.max(8, Math.min(near.y - 8, layer.getHeight() - d.height - 8));
+            statsCard.setBounds(x, y, d.width, d.height);
+            layer.repaint();
+        }
+        statsCard.setVisible(true);
+        refreshBoard();   // outlines the ship the board is about
+    }
+
+    /** Opens the stats board for {@code sp}, or closes it if it is already showing that ship. */
+    public void toggleStats(Ship_Placement sp, Component anchor) {
+        if (sp == null || sp == statsShip) hideStats();
+        else showStats(sp, anchor);
+    }
+
+    /** Closes the stats board. */
+    public void hideStats() {
+        if (statsShip == null && !statsCard.isVisible()) return;
+        statsShip = null;
+        statsCard.setVisible(false);
+        if (statsCard.getParent() != null) statsCard.getParent().repaint();
+        refreshBoard();
+    }
+
+    /** The ship the stats board is showing, or null when it is closed. */
+    public Ship_Placement getStatsShip() {
+        return statsShip;
+    }
+
+    public ShipStatsCard getStatsCard() {
+        return statsCard;
+    }
+
+    /** How many of {@code sp}'s sections the enemy has hit. */
+    public int sectionsHit(Ship_Placement sp) {
+        int n = 0;
+        if (!isDeployed(sp)) return 0;
+        for (Point p : sp.getOccupiedTiles()) {
+            if (p.x >= 0 && p.x < SIZE && p.y >= 0 && p.y < SIZE && incomingHit[p.y][p.x]) n++;
+        }
+        return n;
+    }
+
+    /** The screen area the stats board should sit beside, in {@code layer}'s coordinates. */
+    private Rectangle anchorBounds(Ship_Placement sp, Component anchor, JLayeredPane layer) {
+        Rectangle area = null;
+        if (isDeployed(sp)) {
+            for (Point p : sp.getOccupiedTiles()) {
+                if (p.x < 0 || p.x >= SIZE || p.y < 0 || p.y >= SIZE) continue;
+                JButton cell = cells[p.y][p.x];
+                if (cell.getParent() == null) continue;
+                Rectangle r = SwingUtilities.convertRectangle(cell.getParent(), cell.getBounds(), layer);
+                area = area == null ? r : area.union(r);
+            }
+        }
+        if (area == null && anchor != null && anchor.getParent() != null) {
+            area = SwingUtilities.convertRectangle(anchor.getParent(), anchor.getBounds(), layer);
+        }
+        return area == null ? new Rectangle(0, 0, 0, 0) : area;
     }
 
     // =====================================================================================
@@ -1153,9 +1667,11 @@ public class GameLayout extends JPanel {
         ghostTiles.clear();
         selected = null;
         hovered = null;
+        statsShip = null;
+        statsCard.setVisible(false);
         fleet.reset();
         resetSubmarines();
-        roster.rebuild();
+        setBattleStarted(false);
         refreshBoard();
         announceDeploymentProgress();
     }
@@ -1172,8 +1688,12 @@ public class GameLayout extends JPanel {
      * where they are rather than being forced back into the roster - the player can always
      * drag them, so they can reposition into the new deep water if they want to, and are
      * never made to re-deploy a fleet they were happy with.
+     *
+     * <p>A new stage opens a new deployment phase, so the fleet is unlocked again and the
+     * Start button comes back.
      */
     public void prepareNextStage(boolean healFleet) {
+        setBattleStarted(false);
         for (int r = 0; r < SIZE; r++) {
             for (int c = 0; c < SIZE; c++) {
                 incomingShot[r][c] = false;
@@ -1183,12 +1703,9 @@ public class GameLayout extends JPanel {
         for (Ship_Placement sp : getDeployedPlacements()) {
             int max = scaledMaxHP(sp);
             shipMaxHP.put(sp, max);
-            if (healFleet) {
-                shipHP.put(sp, max);
-            } else {
-                shipHP.put(sp, Math.max(1, Math.min(shipHP.getOrDefault(sp, max), max)));
-            }
+            shipHP.put(sp, Math.max(1, Math.min(shipHP.getOrDefault(sp, max), max)));
         }
+        if (healFleet) repairAll();
         refreshBoard();
     }
 

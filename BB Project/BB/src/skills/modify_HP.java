@@ -41,4 +41,10 @@ public class modify_HP implements Defender_Skills {
     public int turns() {
         return -1;
     }
+
+    /** Doubling every hull for the rest of the run is the strongest passive in the game. */
+    @Override
+    public Rarity rarity() {
+        return Rarity.EPIC;
+    }
 }

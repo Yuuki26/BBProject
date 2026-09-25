@@ -7,8 +7,9 @@ import Ships.Submarine;
 public class Balao extends Submarine {
     public Balao() {
         super("Balao", new ShipStats()
-                .hp(4).shields(1).dmg(5).shots(1)
-                .penetration(6).detection(1).size(2),
-                6);
+                .hp(400).shields(1).dmg(500).shots(1)
+                .penetration(90).detection(1).size(2).cost(5)
+                .image("/ships/vessels/Balao.png"),
+                4);
     }
 }

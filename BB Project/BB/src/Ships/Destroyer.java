@@ -6,16 +6,8 @@ package Ships;
  */
 public abstract class Destroyer extends AbstractShip {
 
-    /** Fixed build cost for every destroyer. */
-    public static final int COST = 2;
-
     protected Destroyer(String name, ShipStats stats) {
         super(name, stats);
-    }
-
-    @Override
-    public final int getCost() {
-        return COST;
     }
 
     @Override
@@ -28,8 +20,9 @@ public abstract class Destroyer extends AbstractShip {
         return "DD";
     }
 
+    /** Hull artwork, shown for any vessel of this class that has no picture of its own yet. */
     @Override
-    public String getImage() {
+    protected String defaultImage() {
         return "/ships/submarine.png";
     }
 }

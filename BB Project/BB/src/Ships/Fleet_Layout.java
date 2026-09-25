@@ -22,7 +22,7 @@ public class Fleet_Layout extends JPanel {
     /** Pixels per hull tile in the roster preview. */
     private static final int TILE = 34;
 
-    private final DefaultFleet fleet;
+    private final PlayerFleet fleet;
     private final GameLayout game;
 
     /** Ships currently shown here, parallel to the label components. */
@@ -30,7 +30,7 @@ public class Fleet_Layout extends JPanel {
 
     private Ship_Placement selected;
 
-    public Fleet_Layout(DefaultFleet fleet, GameLayout game) {
+    public Fleet_Layout(PlayerFleet fleet, GameLayout game) {
         this.fleet = fleet;
         this.game = game;
 
@@ -99,12 +99,16 @@ public class Fleet_Layout extends JPanel {
         }
 
         boolean affordable = game == null || game.canAfford(sp);
-        label.setToolTipText(sp.getShip().getName()
-                + " (" + sp.getShip().getHullCode() + ")"
-                + " - cost " + sp.getShip().getCost()
-                + ", detection " + sp.getShip().getDetection()
-                + (affordable ? ", drag onto the board and press R to rotate"
-                              : " - over budget for this stage"));
+        String hint;
+        if (game != null && game.isBattleStarted()) {
+            hint = "Stays in port until this stage ends";
+        } else if (affordable) {
+            hint = "Drag onto the board, R rotates it";
+        } else {
+            hint = "Over budget for this stage";
+        }
+        label.setToolTipText(game != null ? game.shipTooltip(sp, "in port", hint)
+                : sp.getShip().getName() + " (" + sp.getShip().getHullCode() + ") - " + hint);
 
 
         // Picking a ship up here starts the same carry the board uses. Press, move onto the
@@ -113,7 +117,15 @@ public class Fleet_Layout extends JPanel {
         MouseAdapter carry = new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
-                if (game == null || !SwingUtilities.isLeftMouseButton(e)) return;
+                if (game == null) return;
+                // Right-click opens the ship's stats board; so does a click once the battle
+                // is on, when a ship in port can't be picked up anyway.
+                if (SwingUtilities.isRightMouseButton(e)
+                        || SwingUtilities.isLeftMouseButton(e) && game.isBattleStarted()) {
+                    game.toggleStats(sp, e.getComponent());
+                    return;
+                }
+                if (!SwingUtilities.isLeftMouseButton(e)) return;
                 game.setSelected(sp);
                 game.beginCarry(sp, e.getComponent(), e.getPoint());
             }

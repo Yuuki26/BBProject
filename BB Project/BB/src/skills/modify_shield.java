@@ -44,4 +44,9 @@ public class modify_shield implements Defender_Skills {
     public int turns() {
         return -1;
     }
+
+    @Override
+    public Rarity rarity() {
+        return Rarity.UNCOMMON;
+    }
 }

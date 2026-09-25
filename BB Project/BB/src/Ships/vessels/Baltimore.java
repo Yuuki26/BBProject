@@ -7,7 +7,8 @@ import Ships.ShipStats;
 public class Baltimore extends HeavyCruiser {
     public Baltimore() {
         super("Baltimore", new ShipStats()
-                .hp(10).shields(5).dmg(6).shots(2)
-                .penetration(5).detection(5).size(3));
+                .hp(1050).shields(55).dmg(125).shots(3)
+                .penetration(60).detection(5).size(3).cost(5)
+                .image("/ships/vessels/Baltimore.png"));
     }
 }

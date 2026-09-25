@@ -16,9 +16,6 @@ package Ships;
  */
 public abstract class Submarine extends AbstractShip {
 
-    /** Fixed build cost for every submarine. */
-    public static final int COST = 3;
-
     /** Added to detection while the boat is on the surface. */
     public static final int SURFACED_DETECTION_PENALTY = 4;
 
@@ -40,11 +37,6 @@ public abstract class Submarine extends AbstractShip {
     }
 
     @Override
-    public final int getCost() {
-        return COST;
-    }
-
-    @Override
     public String getHullClass() {
         return "Submarine";
     }
@@ -54,8 +46,9 @@ public abstract class Submarine extends AbstractShip {
         return "SS";
     }
 
+    /** Hull artwork, shown for any vessel of this class that has no picture of its own yet. */
     @Override
-    public String getImage() {
+    protected String defaultImage() {
         return "/ships/submarine.png";
     }
 

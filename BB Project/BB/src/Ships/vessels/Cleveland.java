@@ -7,7 +7,8 @@ import Ships.ShipStats;
 public class Cleveland extends LightCruiser {
     public Cleveland() {
         super("Cleveland", new ShipStats()
-                .hp(8).shields(4).dmg(4).shots(2)
-                .penetration(3).detection(4).size(3));
+                .hp(850).shields(40).dmg(55).shots(3)
+                .penetration(35).detection(4).size(3).cost(4)
+                .image("/ships/vessels/Cleveland.png"));
     }
 }
